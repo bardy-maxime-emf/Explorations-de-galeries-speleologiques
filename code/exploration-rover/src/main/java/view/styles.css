@@ -1,0 +1,136 @@
+.root {
+    -fx-background-color: #0c1411;
+    -fx-font-family: "Segoe UI", "Inter", Arial;
+}
+
+/* Top bar */
+.topbar {
+    -fx-background-color: #0f1c17;
+    -fx-border-color: #1a2f27;
+    -fx-border-width: 0 0 1 0;
+}
+
+.title {
+    -fx-text-fill: #e9fff4;
+    -fx-font-size: 18px;
+    -fx-font-weight: 800;
+}
+.subtitle {
+    -fx-text-fill: #8db7a4;
+    -fx-font-size: 12px;
+}
+
+.statusDot {
+    -fx-text-fill: #2ee58f;
+    -fx-font-size: 18px;
+}
+
+.pill {
+    -fx-background-color: #0f231b;
+    -fx-border-color: #1f3a31;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+    -fx-padding: 6 10;
+    -fx-text-fill: #c8f7e2;
+    -fx-font-weight: 700;
+}
+
+.iconBtn {
+    -fx-background-color: #12261f;
+    -fx-border-color: #1f3a31;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-text-fill: #e9fff4;
+}
+
+/* Page spacing */
+.page {}
+
+/* Cards */
+.card {
+    -fx-background-color: #0f1c17;
+    -fx-border-color: #1a2f27;
+    -fx-border-radius: 18;
+    -fx-background-radius: 18;
+    -fx-padding: 16;
+}
+
+.cardTitle {
+    -fx-text-fill: #e9fff4;
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+}
+
+.cardSub {
+    -fx-text-fill: #8db7a4;
+    -fx-font-size: 12px;
+}
+
+.panel {
+    -fx-background-color: #0b1511;
+    -fx-border-color: #163026;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+}
+
+/* Buttons */
+.primaryBtn {
+    -fx-background-color: #1ad07b;
+    -fx-text-fill: #062014;
+    -fx-font-weight: 800;
+    -fx-background-radius: 999;
+    -fx-padding: 8 14;
+}
+
+.linkBtn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #2ee58f;
+    -fx-font-weight: 700;
+}
+
+/* Mini cards */
+.miniCard {
+    -fx-background-color: #0b1511;
+    -fx-border-color: #163026;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+    -fx-padding: 14;
+}
+
+.miniTitle {
+    -fx-text-fill: #8db7a4;
+    -fx-font-weight: 700;
+}
+
+.bigValue {
+    -fx-text-fill: #e9fff4;
+    -fx-font-size: 34px;
+    -fx-font-weight: 900;
+}
+
+.unit {
+    -fx-text-fill: #8db7a4;
+    -fx-font-weight: 800;
+    -fx-font-size: 14px;
+}
+
+.muted { -fx-text-fill: #8db7a4; -fx-font-weight: 700; }
+.mutedSmall { -fx-text-fill: #567e6b; -fx-font-size: 11px; }
+
+/* Progress bars */
+.greenBar { -fx-accent: #2ee58f; }
+.redBar { -fx-accent: #ff6b6b; }
+
+/* Sonar shapes */
+.sonarRing { -fx-stroke: #1c3a2f; -fx-stroke-width: 1.2; -fx-fill: transparent; }
+.sonarGrid { -fx-stroke: #153126; -fx-stroke-width: 1; }
+
+.sonarSweep { -fx-fill: rgba(26, 208, 123, 0.20); -fx-stroke: transparent; }
+.sonarBeam { -fx-stroke: #2ee58f; -fx-stroke-width: 2; -fx-opacity: 0.9; }
+
+.sonarBlip { -fx-fill: #2ee58f; }
+.sonarBlipSoft { -fx-fill: rgba(46, 229, 143, 0.75); }
+
+/* Trajectory */
+.trajLine { -fx-stroke: #2ee58f; -fx-stroke-width: 2.5; -fx-fill: transparent; -fx-opacity: 0.95; }
+.trajDot { -fx-fill: #2ee58f; }
