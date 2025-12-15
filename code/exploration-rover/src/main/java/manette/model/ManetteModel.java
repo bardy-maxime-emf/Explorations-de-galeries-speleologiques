@@ -1,48 +1,58 @@
 package manette.model;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class ManetteModel {
 
     public enum ModeVitesse {
-        LENTE,
-        NORMALE
+        LENTE, NORMALE
     }
 
     public enum BatteryLevel {
-        UNKNOWN,
-        EMPTY,
-        LOW,
-        MEDIUM,
-        FULL
+        UNKNOWN, EMPTY, LOW, MEDIUM, FULL
     }
 
     public enum BatteryType {
-        UNKNOWN,
-        DISCONNECTED,
-        WIRED,
-        ALKALINE,
-        NIMH
+        UNKNOWN, DISCONNECTED, WIRED, ALKALINE, NIMH
     }
 
-    private boolean connected;
+    // ===== État connexion =====
+    private volatile boolean connected;
 
-    private float leftX;
-    private float leftY;
-    private float rightX;
-    private float rightY;
+    // ===== Axes =====
+    private volatile float leftX;
+    private volatile float leftY;
+    private volatile float rightX;
+    private volatile float rightY;
 
-    private boolean buttonA;
-    private boolean buttonB;
-    private boolean buttonLB;
-    private boolean buttonRB;
+    // ===== Boutons utiles =====
+    private volatile boolean buttonB;
+    private volatile boolean buttonLB;
+    private volatile boolean buttonRB;
 
-    private ModeVitesse modeVitesse = ModeVitesse.NORMALE;
+    // Mode vitesse “logique” (ex: lié à LB)
+    private volatile ModeVitesse modeVitesse = ModeVitesse.NORMALE;
 
-    private BatteryLevel batteryLevel = BatteryLevel.UNKNOWN;
-    private BatteryType batteryType = BatteryType.UNKNOWN;
+    // ===== Batterie =====
+    private volatile BatteryLevel batteryLevel = BatteryLevel.UNKNOWN;
+    private volatile BatteryType batteryType = BatteryType.UNKNOWN;
 
-    // debug (facultatif mais pratique)
-    private int vibrationLeft;
-    private int vibrationRight;
+    // ===== Debug vibration =====
+    private volatile int vibrationLeft;
+    private volatile int vibrationRight;
+
+    // ===== Signal radio (à brancher plus tard) =====
+    // - linkLost: vrai = perte de liaison rover/radio (pas la manette
+    // USB/Bluetooth)
+    // - linkQuality: 0..1 (optionnel), -1 = inconnu
+    private volatile boolean linkLost = false;
+    private volatile float linkQuality = -1f;
+
+    // ===== Événements “edge” =====
+    // On les consomme depuis le Main (évite de stocker prevB partout).
+    private final AtomicBoolean emergencyStopClick = new AtomicBoolean(false);
+
+    // ===== Get / Set =====
 
     public boolean isConnected() {
         return connected;
@@ -82,14 +92,6 @@ public class ManetteModel {
 
     public void setRightY(float rightY) {
         this.rightY = rightY;
-    }
-
-    public boolean isButtonA() {
-        return buttonA;
-    }
-
-    public void setButtonA(boolean buttonA) {
-        this.buttonA = buttonA;
     }
 
     public boolean isButtonB() {
@@ -154,5 +156,37 @@ public class ManetteModel {
 
     public void setVibrationRight(int vibrationRight) {
         this.vibrationRight = vibrationRight;
+    }
+
+    public boolean isLinkLost() {
+        return linkLost;
+    }
+
+    public void setLinkLost(boolean linkLost) {
+        this.linkLost = linkLost;
+    }
+
+    public float getLinkQuality() {
+        return linkQuality;
+    }
+
+    public void setLinkQuality(float linkQuality) {
+        this.linkQuality = linkQuality;
+    }
+
+    // ===== Event: arrêt d'urgence (clic B) =====
+
+    /** Appelé par le controller quand il détecte un clic (edge) sur B. */
+    public void fireEmergencyStopClick() {
+        emergencyStopClick.set(true);
+    }
+
+    /**
+     * Appelé par ton Main: retourne true UNE FOIS par clic.
+     * Exemple:
+     * if (pad.consumeEmergencyStopClick()) rover.emergencyStop();
+     */
+    public boolean consumeEmergencyStopClick() {
+        return emergencyStopClick.getAndSet(false);
     }
 }
