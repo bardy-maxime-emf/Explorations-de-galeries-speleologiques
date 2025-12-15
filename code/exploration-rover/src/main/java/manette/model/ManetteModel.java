@@ -7,6 +7,22 @@ public class ManetteModel {
         NORMALE
     }
 
+    public enum BatteryLevel {
+        UNKNOWN,
+        EMPTY,
+        LOW,
+        MEDIUM,
+        FULL
+    }
+
+    public enum BatteryType {
+        UNKNOWN,
+        DISCONNECTED,
+        WIRED,
+        ALKALINE,
+        NIMH
+    }
+
     private boolean connected;
 
     private float leftX;
@@ -20,6 +36,13 @@ public class ManetteModel {
     private boolean buttonRB;
 
     private ModeVitesse modeVitesse = ModeVitesse.NORMALE;
+
+    private BatteryLevel batteryLevel = BatteryLevel.UNKNOWN;
+    private BatteryType batteryType = BatteryType.UNKNOWN;
+
+    // debug (facultatif mais pratique)
+    private int vibrationLeft;
+    private int vibrationRight;
 
     public boolean isConnected() {
         return connected;
@@ -99,5 +122,37 @@ public class ManetteModel {
 
     public void setModeVitesse(ModeVitesse modeVitesse) {
         this.modeVitesse = modeVitesse;
+    }
+
+    public BatteryLevel getBatteryLevel() {
+        return batteryLevel;
+    }
+
+    public void setBatteryLevel(BatteryLevel batteryLevel) {
+        this.batteryLevel = batteryLevel;
+    }
+
+    public BatteryType getBatteryType() {
+        return batteryType;
+    }
+
+    public void setBatteryType(BatteryType batteryType) {
+        this.batteryType = batteryType;
+    }
+
+    public int getVibrationLeft() {
+        return vibrationLeft;
+    }
+
+    public void setVibrationLeft(int vibrationLeft) {
+        this.vibrationLeft = vibrationLeft;
+    }
+
+    public int getVibrationRight() {
+        return vibrationRight;
+    }
+
+    public void setVibrationRight(int vibrationRight) {
+        this.vibrationRight = vibrationRight;
     }
 }
