@@ -6,30 +6,34 @@ import com.github.strikerx3.jxinput.XInputComponents;
 import com.github.strikerx3.jxinput.XInputDevice;
 
 import manette.model.ManetteModel;
+import manette.services.BatteryService;
+import manette.services.HapticsService;
 import manette.view.ManetteView;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 
+/**
+ * ManetteController:
+ * - gère connexion/reconnexion XInput
+ * - met à jour le ManetteModel
+ * - gère batterie (XInput 1.4 via reflection)
+ * - gère vibrations d'alertes (batterie / perte de signal)
+ */
 public class ManetteController {
 
     private static final int PLAYER_INDEX = 0; // 0..3
     private static final int LOOP_MS = 50; // 20 FPS
     private static final float DEADZONE = 0.10f; // 10%
-    private static final int RECONNECT_MS = 1000; // retry init toutes les 1s si off
-    private static final int BATTERY_POLL_MS = 1000;
+    private static final int RECONNECT_MS = 1000; // retry init toutes les 1s
+    private static final int BATTERY_POLL_MS = 1000; // 1s
 
     private final ManetteModel model;
     private final ManetteView view;
 
-    private XInputDevice device; // XInput 1.3
+    private final BatteryService batteryService;
+    private final HapticsService haptics;
 
-    // XInput 1.4 (batterie) en reflection (robuste selon jar/OS)
-    private boolean x14Checked = false;
-    private boolean x14Available = false;
-    private Object device14 = null;
-    private Method mGetBatteryInfo = null;
-    private Object batteryDevTypeGamepad = null;
+    private XInputDevice device;
 
     private volatile boolean running = false;
     private boolean wasConnected = false;
@@ -37,16 +41,21 @@ public class ManetteController {
     private long nextReconnectAttemptAt = 0;
     private long nextBatteryPollAt = 0;
 
-    // Flags alertes (pour éviter spam vibrations)
+    // Edge detection (clic)
+    private boolean prevB = false;
+
+    // Flags alertes (évite spam vibrations)
     private boolean lowBatteryWarned = false;
-    private boolean weakSignalWarned = false; // futur
-    private boolean shockWarned = false; // futur
+    private boolean linkLostWarned = false;
+    private boolean shockWarned = false; // placeholder
 
     public ManetteController(ManetteModel model, ManetteView view) {
         this.model = model;
         this.view = view;
+        this.batteryService = new BatteryService(PLAYER_INDEX);
+        this.haptics = new HapticsService(model);
+
         initDeviceIfNeeded(true);
-        initXInput14IfPossible();
     }
 
     public void startDebugLoop() {
@@ -55,12 +64,11 @@ public class ManetteController {
         running = true;
 
         Thread loop = new Thread(() -> {
-            System.out.println("[MANETTE] Debug loop démarrée.");
+            System.out.println("[MANETTE] Loop démarrée.");
             while (running) {
                 try {
                     pollOnce();
 
-                    // On affiche UNIQUEMENT quand connecté
                     if (model.isConnected()) {
                         view.renderConsole(model);
                     }
@@ -70,11 +78,11 @@ public class ManetteController {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Throwable t) {
-                    System.out.println("[MANETTE] Erreur loop: "
-                            + t.getClass().getSimpleName() + " - " + t.getMessage());
+                    System.out
+                            .println("[MANETTE] Erreur loop: " + t.getClass().getSimpleName() + " - " + t.getMessage());
                 }
             }
-            System.out.println("[MANETTE] Debug loop arrêtée.");
+            System.out.println("[MANETTE] Loop arrêtée.");
         });
 
         loop.setDaemon(true);
@@ -83,62 +91,7 @@ public class ManetteController {
 
     public void stop() {
         running = false;
-        stopVibration();
-    }
-
-    // ===== VIBRATION (public) =====
-
-    /** Vibration continue (0..65535). */
-    public void setVibration(int leftMotor, int rightMotor) {
-        if (!model.isConnected() || device == null)
-            return;
-
-        leftMotor = clampVibration(leftMotor);
-        rightMotor = clampVibration(rightMotor);
-
-        try {
-            device.setVibration(leftMotor, rightMotor);
-            model.setVibrationLeft(leftMotor);
-            model.setVibrationRight(rightMotor);
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /** Vibration courte puis stop automatique. */
-    public void pulseVibration(int leftMotor, int rightMotor, int durationMs) {
-        if (!model.isConnected() || device == null)
-            return;
-
-        setVibration(leftMotor, rightMotor);
-
-        Thread t = new Thread(() -> {
-            try {
-                Thread.sleep(Math.max(0, durationMs));
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            stopVibration();
-        });
-        t.setDaemon(true);
-        t.start();
-    }
-
-    public void stopVibration() {
-        try {
-            if (device != null)
-                device.setVibration(0, 0);
-        } catch (Throwable ignored) {
-        }
-        model.setVibrationLeft(0);
-        model.setVibrationRight(0);
-    }
-
-    private int clampVibration(int v) {
-        if (v < 0)
-            return 0;
-        if (v > 65535)
-            return 65535;
-        return v;
+        haptics.stopVibration();
     }
 
     // ===== LOOP =====
@@ -146,7 +99,7 @@ public class ManetteController {
     private void pollOnce() {
         long now = System.currentTimeMillis();
 
-        // Si pas de device, on retente (pas en boucle ultra rapide)
+        // Retente acquisition du device si null
         if (device == null) {
             if (now >= nextReconnectAttemptAt) {
                 nextReconnectAttemptAt = now + RECONNECT_MS;
@@ -157,7 +110,7 @@ public class ManetteController {
 
         boolean ok;
         try {
-            ok = device.poll(); // false si déconnectée
+            ok = device.poll();
         } catch (Throwable t) {
             device = null;
             setDisconnectedOnce("Erreur XInput pendant poll()", t);
@@ -165,6 +118,12 @@ public class ManetteController {
         }
 
         if (!ok) {
+            // Tentative de “bip” de vibration au moment où ça décroche (peut échouer)
+            try {
+                device.setVibration(20000, 0);
+            } catch (Throwable ignored) {
+            }
+            device = null;
             setDisconnectedOnce("Manette déconnectée.", null);
             return;
         }
@@ -177,7 +136,7 @@ public class ManetteController {
 
         model.setConnected(true);
 
-        // Lire sticks/boutons
+        // Lire composants
         XInputComponents c = device.getComponents();
         XInputAxes axes = c.getAxes();
         XInputButtons buttons = c.getButtons();
@@ -187,71 +146,50 @@ public class ManetteController {
         model.setRightX(applyDeadzone(axes.rx));
         model.setRightY(applyDeadzone(axes.ry));
 
-        model.setButtonA(readBoolField(buttons, "a"));
-        model.setButtonB(readBoolField(buttons, "b"));
-        model.setButtonLB(readBoolField(buttons, "lb", "lShoulder", "leftShoulder", "lBumper", "leftBumper"));
-        model.setButtonRB(readBoolField(buttons, "rb", "rShoulder", "rightShoulder", "rBumper", "rightBumper"));
+        boolean b = readBoolField(buttons, "b");
+        boolean lb = readBoolField(buttons, "lb", "lShoulder", "leftShoulder", "lBumper", "leftBumper");
+        boolean rb = readBoolField(buttons, "rb", "rShoulder", "rightShoulder", "rBumper", "rightBumper");
 
-        // Batterie
+        model.setButtonB(b);
+        model.setButtonLB(lb);
+        model.setButtonRB(rb);
+
+        // Mode vitesse “logique” (ex: LB = lent)
+        model.setModeVitesse(lb ? ManetteModel.ModeVitesse.LENTE : ManetteModel.ModeVitesse.NORMALE);
+
+        // Edge: clic sur B => événement arrêt d'urgence
+        if (b && !prevB) {
+            model.fireEmergencyStopClick();
+        }
+        prevB = b;
+
+        // Batterie (poll toutes les 1s)
         if (now >= nextBatteryPollAt) {
             nextBatteryPollAt = now + BATTERY_POLL_MS;
-            updateBattery();
+            var batt = batteryService.readBattery();
+            model.setBatteryLevel(batt.level());
+            model.setBatteryType(batt.type());
         }
 
-        // ✅ Gestion centralisée des vibrations (batterie/signal/choc)
+        // Vibration alerts
         handleVibrationAlerts();
-    }
-
-    /**
-     * Centralise les règles de vibration.
-     * Plus tard tu ajouteras ici:
-     * - signal faible
-     * - choc détecté
-     */
-    private void handleVibrationAlerts() {
-        // --- Batterie faible ---
-        if (model.getBatteryLevel() == ManetteModel.BatteryLevel.LOW && !lowBatteryWarned) {
-            lowBatteryWarned = true;
-            pulseVibration(20000, 20000, 250);
-            System.out.println("[MANETTE] Batterie LOW -> vibration d'alerte.");
-        }
-        if (model.getBatteryLevel() != ManetteModel.BatteryLevel.LOW) {
-            lowBatteryWarned = false;
-        }
-
-        // --- Signal faible (placeholder) ---
-        // boolean weakSignal = false; // TODO: brancher avec module radio plus tard
-        // if (weakSignal && !weakSignalWarned) {
-        // weakSignalWarned = true;
-        // pulseVibration(25000, 0, 400);
-        // System.out.println("[MANETTE] Signal faible -> vibration d'alerte.");
-        // }
-        // if (!weakSignal) weakSignalWarned = false;
-
-        // --- Choc détecté (placeholder) ---
-        // boolean shockDetected = false; // TODO: brancher avec module capteurs plus
-        // tard
-        // if (shockDetected && !shockWarned) {
-        // shockWarned = true;
-        // pulseVibration(0, 30000, 200);
-        // pulseVibration(0, 30000, 200);
-        // System.out.println("[MANETTE] Choc détecté -> vibration d'alerte.");
-        // }
-        // if (!shockDetected) shockWarned = false;
     }
 
     private void initDeviceIfNeeded(boolean log) {
         try {
             if (!XInputDevice.isAvailable()) {
                 device = null;
+                haptics.attachDevice(null);
                 setDisconnectedOnce("XInputDevice non disponible sur cette machine.", null);
                 return;
             }
             device = XInputDevice.getDeviceFor(PLAYER_INDEX);
+            haptics.attachDevice(device);
             if (log)
-                System.out.println("[MANETTE] XInput 1.3 prêt. Player=" + PLAYER_INDEX);
+                System.out.println("[MANETTE] XInput prêt. Player=" + PLAYER_INDEX);
         } catch (Throwable t) {
             device = null;
+            haptics.attachDevice(null);
             setDisconnectedOnce("Impossible de charger XInput (JXInput).", t);
         }
     }
@@ -259,7 +197,6 @@ public class ManetteController {
     private void setDisconnectedOnce(String msg, Throwable t) {
         model.setConnected(false);
         resetModel();
-        stopVibration();
 
         if (wasConnected) {
             wasConnected = false;
@@ -276,18 +213,24 @@ public class ManetteController {
         model.setRightX(0f);
         model.setRightY(0f);
 
-        model.setButtonA(false);
         model.setButtonB(false);
         model.setButtonLB(false);
         model.setButtonRB(false);
 
+        model.setModeVitesse(ManetteModel.ModeVitesse.NORMALE);
+
         model.setBatteryLevel(ManetteModel.BatteryLevel.UNKNOWN);
         model.setBatteryType(ManetteModel.BatteryType.UNKNOWN);
 
+        model.setVibrationLeft(0);
+        model.setVibrationRight(0);
+
         // reset flags alertes
         lowBatteryWarned = false;
-        weakSignalWarned = false;
+        linkLostWarned = false;
         shockWarned = false;
+
+        prevB = false;
     }
 
     private float applyDeadzone(float v) {
@@ -308,80 +251,47 @@ public class ManetteController {
         return false;
     }
 
-    // ===== BATTERIE (XInput 1.4 via reflection) =====
+    /**
+     * Centralise les règles de vibration.
+     * - Batterie faible => alerte
+     * - Perte de signal (radio rover) => alerte (à brancher via
+     * model.setLinkLost(true))
+     * - Choc => placeholder commenté
+     */
+    private void handleVibrationAlerts() {
+        // --- Batterie faible ---
+        boolean battLow = (model.getBatteryLevel() == ManetteModel.BatteryLevel.LOW
+                || model.getBatteryLevel() == ManetteModel.BatteryLevel.EMPTY);
 
-    private void initXInput14IfPossible() {
-        if (x14Checked)
-            return;
-        x14Checked = true;
-
-        try {
-            Class<?> cls14 = Class.forName("com.github.strikerx3.jxinput.XInputDevice14");
-            Method isAvail = cls14.getMethod("isAvailable");
-            x14Available = Boolean.TRUE.equals(isAvail.invoke(null));
-
-            if (!x14Available)
-                return;
-
-            Method getDevFor = cls14.getMethod("getDeviceFor", int.class);
-            device14 = getDevFor.invoke(null, PLAYER_INDEX);
-
-            Class<?> battDevTypeCls = Class.forName("com.github.strikerx3.jxinput.enums.XInputBatteryDeviceType");
-            batteryDevTypeGamepad = Enum.valueOf((Class<? extends Enum>) battDevTypeCls, "GAMEPAD");
-
-            mGetBatteryInfo = cls14.getMethod("getBatteryInformation", battDevTypeCls);
-
-            System.out.println("[MANETTE] XInput 1.4 dispo -> batterie activée.");
-        } catch (Throwable t) {
-            x14Available = false;
-            device14 = null;
-            mGetBatteryInfo = null;
-            batteryDevTypeGamepad = null;
+        if (battLow && !lowBatteryWarned) {
+            lowBatteryWarned = true;
+            haptics.pulseVibration(20000, 20000, 250);
+            System.out.println("[MANETTE] Batterie faible -> vibration d'alerte.");
         }
-    }
-
-    private void updateBattery() {
-        initXInput14IfPossible();
-        if (!x14Available || device14 == null || mGetBatteryInfo == null || batteryDevTypeGamepad == null) {
-            model.setBatteryLevel(ManetteModel.BatteryLevel.UNKNOWN);
-            model.setBatteryType(ManetteModel.BatteryType.UNKNOWN);
-            return;
+        if (!battLow) {
+            lowBatteryWarned = false;
         }
 
-        try {
-            Object info = mGetBatteryInfo.invoke(device14, batteryDevTypeGamepad);
-
-            Method mLevel = info.getClass().getMethod("getLevel");
-            Method mType = info.getClass().getMethod("getType");
-
-            String levelStr = String.valueOf(mLevel.invoke(info)); // "LOW", "FULL", ...
-            String typeStr = String.valueOf(mType.invoke(info)); // "WIRED", "ALKALINE", ...
-
-            model.setBatteryLevel(mapBatteryLevel(levelStr));
-            model.setBatteryType(mapBatteryType(typeStr));
-        } catch (Throwable t) {
-            model.setBatteryLevel(ManetteModel.BatteryLevel.UNKNOWN);
-            model.setBatteryType(ManetteModel.BatteryType.UNKNOWN);
+        // --- Perte de signal (radio rover) ---
+        // À brancher quand vous aurez un module radio:
+        // - si le rover ne répond plus / RSSI à 0 => model.setLinkLost(true)
+        if (model.isLinkLost() && !linkLostWarned) {
+            linkLostWarned = true;
+            haptics.pulseVibration(30000, 0, 400);
+            System.out.println("[MANETTE] Perte de signal (linkLost) -> vibration d'alerte.");
         }
-    }
-
-    private ManetteModel.BatteryLevel mapBatteryLevel(String s) {
-        if (s == null)
-            return ManetteModel.BatteryLevel.UNKNOWN;
-        try {
-            return ManetteModel.BatteryLevel.valueOf(s);
-        } catch (IllegalArgumentException e) {
-            return ManetteModel.BatteryLevel.UNKNOWN;
+        if (!model.isLinkLost()) {
+            linkLostWarned = false;
         }
-    }
 
-    private ManetteModel.BatteryType mapBatteryType(String s) {
-        if (s == null)
-            return ManetteModel.BatteryType.UNKNOWN;
-        try {
-            return ManetteModel.BatteryType.valueOf(s);
-        } catch (IllegalArgumentException e) {
-            return ManetteModel.BatteryType.UNKNOWN;
-        }
+        // --- Choc détecté (placeholder) ---
+        // boolean shockDetected = false; // TODO: brancher sur IMU/accéléro plus tard
+        // if (shockDetected && !shockWarned) {
+        // shockWarned = true;
+        // haptics.pulseVibration(0, 30000, 200);
+        // haptics.pulseVibration(0, 30000, 200);
+        // System.out.println("[MANETTE] Choc détecté -> vibration d'alerte.");
+        // }
+        // if (!shockDetected) shockWarned = false;
     }
 }
