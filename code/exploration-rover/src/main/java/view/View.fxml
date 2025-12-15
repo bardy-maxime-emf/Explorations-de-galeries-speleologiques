@@ -1,35 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
-<?import javafx.scene.shape.*?>
-<?import javafx.scene.text.*?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.shape.CubicCurveTo?>
+<?import javafx.scene.shape.MoveTo?>
+<?import javafx.scene.shape.Path?>
 
-<BorderPane xmlns="http://javafx.com/javafx/25"
-            xmlns:fx="http://javafx.com/fxml/1"
-            prefWidth="1200" prefHeight="720"
-            stylesheets="@styles.css"
-            styleClass="root">
+<BorderPane prefHeight="720" prefWidth="1200" styleClass="root" stylesheets="@styles.css" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1">
 
     <!-- TOP BAR -->
     <top>
-        <HBox spacing="12" alignment="CENTER_LEFT" styleClass="topbar">
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
             <padding>
-                <Insets top="14" right="14" bottom="14" left="14"/>
+                <Insets bottom="14" left="14" right="14" top="14" />
             </padding>
 
-            <Label text="●" styleClass="statusDot"/>
+            <Label styleClass="statusDot" text="●" />
 
             <VBox spacing="2">
-                <Label text="Tableau de bord Sonar et Capteurs" styleClass="title"/>
-                <Label text="Monitoring System v2.4" styleClass="subtitle"/>
+                <Label styleClass="title" text="Tableau de bord Sonar et Capteurs" />
+                <Label styleClass="subtitle" text="Monitoring System v2.4" />
             </VBox>
 
-            <Region HBox.hgrow="ALWAYS"/>
+            <Region HBox.hgrow="ALWAYS" />
 
-            <Label text="Status : En ligne" styleClass="pill"/>
-            <Button text="⚙" styleClass="iconBtn"/>
+            <Label styleClass="pill" text="Status : En ligne" />
+            <Button styleClass="iconBtn" text="⚙" />
         </HBox>
     </top>
 
@@ -37,94 +43,76 @@
     <center>
         <VBox spacing="14" styleClass="page">
             <padding>
-                <Insets top="14" right="14" bottom="14" left="14"/>
+                <Insets bottom="14" left="14" right="14" top="14" />
             </padding>
 
             <!-- Main row -->
             <HBox spacing="14" VBox.vgrow="ALWAYS">
 
                 <!-- SONAR -->
-                <VBox spacing="10" HBox.hgrow="ALWAYS" styleClass="card">
+                <VBox spacing="10" styleClass="card" HBox.hgrow="ALWAYS">
                     <HBox alignment="CENTER_LEFT">
                         <VBox spacing="2">
-                            <Label text="Visualisation Sonar" styleClass="cardTitle"/>
-                            <Label text="Scan statique · Portée: 50m" styleClass="cardSub"/>
+                            <Label styleClass="cardTitle" text="Visualisation Sonar" />
+                            <Label styleClass="cardSub" text="Scan statique · Portée: 50m" />
                         </VBox>
-                        <Region HBox.hgrow="ALWAYS"/>
-                        <Button text="Agrandir" styleClass="primaryBtn"/>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button styleClass="primaryBtn" text="Agrandir" />
                     </HBox>
 
                     <!-- Zone sonar (dessin simple) -->
-                    <StackPane VBox.vgrow="ALWAYS" styleClass="panel">
-                        <Pane prefWidth="700" prefHeight="320">
-                            <!-- Cercles -->
-                            <Circle centerX="350" centerY="160" radius="140" styleClass="sonarRing"/>
-                            <Circle centerX="350" centerY="160" radius="100" styleClass="sonarRing"/>
-                            <Circle centerX="350" centerY="160" radius="60"  styleClass="sonarRing"/>
-
-                            <Line startX="350" startY="20" endX="350" endY="300" styleClass="sonarGrid"/>
-                            <Line startX="210" startY="160" endX="490" endY="160" styleClass="sonarGrid"/>
-
-                            <!-- “Scan” -->
-                            <Arc centerX="350" centerY="160" radiusX="170" radiusY="170"
-                                 startAngle="210" length="70" type="ROUND"
-                                 styleClass="sonarSweep"/>
-
-                            <Line startX="350" startY="160" endX="220" endY="250" styleClass="sonarBeam"/>
-
-                            <!-- Points -->
-                            <Circle centerX="420" centerY="120" radius="6" styleClass="sonarBlip"/>
-                            <Circle centerX="470" centerY="105" radius="4" styleClass="sonarBlipSoft"/>
-                            <Circle centerX="320" centerY="185" radius="4" styleClass="sonarBlipSoft"/>
+                    <StackPane styleClass="panel" VBox.vgrow="ALWAYS">
+                        <Pane prefHeight="320" prefWidth="700">
+                     <Canvas height="42.0" layoutX="42.0" layoutY="289.0" width="683.0" fx:id="xAxisCanva" />
                         </Pane>
                     </StackPane>
 
                     <HBox spacing="10">
-                        <Label text="GAIN : 3/5" styleClass="muted"/>
-                        <Label text="PROFONDEUR : 12.4 m" styleClass="muted"/>
+                        <Label styleClass="muted" text="GAIN : 3/5" />
+                        <Label styleClass="muted" text="PROFONDEUR : 12.4 m" />
                     </HBox>
                 </VBox>
 
                 <!-- RIGHT SENSORS -->
-                <VBox spacing="10" prefWidth="360" styleClass="card">
+                <VBox prefWidth="360" spacing="10" styleClass="card">
                     <HBox alignment="CENTER_LEFT">
-                        <Label text="Données Capteurs" styleClass="cardTitle"/>
-                        <Region HBox.hgrow="ALWAYS"/>
-                        <Button text="Réinitialiser" styleClass="linkBtn"/>
+                        <Label styleClass="cardTitle" text="Données Capteurs" />
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button styleClass="linkBtn" text="Réinitialiser" />
                     </HBox>
 
                     <!-- Temp -->
                     <VBox spacing="8" styleClass="miniCard">
-                        <Label text="🌡 Température" styleClass="miniTitle"/>
-                        <HBox spacing="6" alignment="BASELINE_LEFT">
-                            <Label text="24.5" styleClass="bigValue"/>
-                            <Label text="°C" styleClass="unit"/>
+                        <Label styleClass="miniTitle" text="🌡 Température" />
+                        <HBox alignment="BASELINE_LEFT" spacing="6">
+                            <Label fx:id="lblTemperature" styleClass="bigValue" />
+                            <Label styleClass="unit" text="°C" />
                         </HBox>
-                        <ProgressBar progress="0.62" styleClass="greenBar"/>
-                        <Label text="Moyenne: 24.1°C" styleClass="mutedSmall"/>
+                        <ProgressBar progress="0.62" styleClass="greenBar" />
+                        <Label styleClass="mutedSmall" text="Moyenne: 24.1°C" />
                     </VBox>
 
                     <!-- Humidité -->
                     <VBox spacing="8" styleClass="miniCard">
-                        <Label text="💧 Humidité relative" styleClass="miniTitle"/>
-                        <HBox spacing="6" alignment="BASELINE_LEFT">
-                            <Label text="48" styleClass="bigValue"/>
+                        <Label styleClass="miniTitle" text="💧 Humidité relative" />
+                        <HBox alignment="BASELINE_LEFT" spacing="6">
+                            <Label fx:id="lblHumidite" styleClass="bigValue" />
                             <!-- IMPORTANT: pour afficher % seul => "%%" -->
-                            <Label text="%%" styleClass="unit"/>
+                            <Label styleClass="unit" text="%%" />
                         </HBox>
-                        <ProgressBar progress="0.48" styleClass="greenBar"/>
-                        <Label text="Zone de confort" styleClass="mutedSmall"/>
+                        <ProgressBar progress="0.48" styleClass="greenBar" />
+                        <Label styleClass="mutedSmall" text="Zone de confort" />
                     </VBox>
 
                     <!-- Lumière -->
                     <VBox spacing="8" styleClass="miniCard">
-                        <Label text="💡 Intensité lumière" styleClass="miniTitle"/>
-                        <HBox spacing="6" alignment="BASELINE_LEFT">
-                            <Label text="850" styleClass="bigValue"/>
-                            <Label text="Lux" styleClass="unit"/>
+                        <Label styleClass="miniTitle" text="💡 Intensité lumière" />
+                        <HBox alignment="BASELINE_LEFT" spacing="6">
+                            <Label fx:id="lblLuminosite" styleClass="bigValue" />
+                            <Label styleClass="unit" text="Lux" />
                         </HBox>
-                        <ProgressBar progress="0.85" styleClass="redBar"/>
-                        <Label text="Intensité élevée" styleClass="mutedSmall"/>
+                        <ProgressBar progress="0.85" styleClass="redBar" />
+                        <Label styleClass="mutedSmall" text="Intensité élevée" />
                     </VBox>
                 </VBox>
 
@@ -134,23 +122,23 @@
             <VBox spacing="10" styleClass="card">
                 <HBox alignment="CENTER_LEFT">
                     <VBox spacing="2">
-                        <Label text="Trajectoire du Rover" styleClass="cardTitle"/>
-                        <Label text="Visualisation statique" styleClass="cardSub"/>
+                        <Label styleClass="cardTitle" text="Trajectoire du Rover" />
+                        <Label styleClass="cardSub" text="Visualisation statique" />
                     </VBox>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <Label text="X : 45.2   Y : 12.8" styleClass="pill"/>
+                    <Region HBox.hgrow="ALWAYS" />
+                    <Label styleClass="pill" text="X : 45.2   Y : 12.8" />
                 </HBox>
 
                 <StackPane prefHeight="140" styleClass="panel">
-                    <Pane prefWidth="1100" prefHeight="140">
+                    <Pane prefHeight="140" prefWidth="1100">
                         <Path styleClass="trajLine">
                             <elements>
-                                <MoveTo x="60" y="100"/>
-                                <CubicCurveTo controlX1="220" controlY1="80" controlX2="360" controlY2="60" x="520" y="55"/>
-                                <CubicCurveTo controlX1="680" controlY1="50" controlX2="820" controlY2="48" x="980" y="46"/>
+                                <MoveTo x="60" y="100" />
+                                <CubicCurveTo controlX1="220" controlX2="360" controlY1="80" controlY2="60" x="520" y="55" />
+                                <CubicCurveTo controlX1="680" controlX2="820" controlY1="50" controlY2="48" x="980" y="46" />
                             </elements>
                         </Path>
-                        <Circle centerX="980" centerY="46" radius="5" styleClass="trajDot"/>
+                        <Circle centerX="980" centerY="46" radius="5" styleClass="trajDot" />
                     </Pane>
                 </StackPane>
             </VBox>
