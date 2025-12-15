@@ -1,0 +1,6 @@
+{
+    "java.project.referencedLibraries": [
+        "code/exploration-rover/lib/**/*.jar",
+        "code/exploration-rover/lib/phidget22.jar"
+    ]
+}
