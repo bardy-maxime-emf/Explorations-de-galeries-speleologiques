@@ -5,7 +5,7 @@ import com.phidget22.PhidgetException;
 
 public class Connection {
 
-    private static final String SERVER_NAME = "ROVERG1";
+    private static final String SERVER_NAME = "ROVER";
 
     private String ip;
     private int port;
