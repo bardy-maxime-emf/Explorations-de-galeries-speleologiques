@@ -122,14 +122,40 @@
 .redBar { -fx-accent: #ff6b6b; }
 
 /* Sonar shapes */
-.sonarRing { -fx-stroke: #1c3a2f; -fx-stroke-width: 1.2; -fx-fill: transparent; }
-.sonarGrid { -fx-stroke: #153126; -fx-stroke-width: 1; }
+.sonarGraduation {
+    -fx-stroke: #2ee58f; /* vert sonar */
+    -fx-stroke-width: 1.2;
+}
 
-.sonarSweep { -fx-fill: rgba(26, 208, 123, 0.20); -fx-stroke: transparent; }
-.sonarBeam { -fx-stroke: #2ee58f; -fx-stroke-width: 2; -fx-opacity: 0.9; }
+.sonarGraduationText {
+    -fx-fill: #2ee58f;
+    -fx-font-weight: 700;
+}
 
-.sonarBlip { -fx-fill: #2ee58f; }
-.sonarBlipSoft { -fx-fill: rgba(46, 229, 143, 0.75); }
+.sonarBlipBlack {
+    -fx-fill:  #0b1511;
+    -fx-stroke: #0b1511; /* optionnel : contour vert */
+    -fx-stroke-width: 1;
+
+}
+
+.sonarRover {
+    -fx-fill: #6b6b6b;      /* gris */
+    -fx-stroke: #3a3a3a;
+    -fx-stroke-width: 1.2;
+    -fx-arc-width: 6;
+    -fx-arc-height: 6;
+}
+
+.sonarRoverText {
+    -fx-fill: #ffffff;
+    -fx-font-size: 22px;
+    -fx-font-weight: 800;
+}
+
+
+
+
 
 /* Trajectory */
 .trajLine { -fx-stroke: #2ee58f; -fx-stroke-width: 2.5; -fx-fill: transparent; -fx-opacity: 0.95; }
