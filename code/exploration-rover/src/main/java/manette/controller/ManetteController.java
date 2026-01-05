@@ -4,7 +4,6 @@ import com.github.strikerx3.jxinput.XInputAxes;
 import com.github.strikerx3.jxinput.XInputButtons;
 import com.github.strikerx3.jxinput.XInputComponents;
 import com.github.strikerx3.jxinput.XInputDevice;
-
 import manette.model.ManetteModel;
 import manette.services.BatteryService;
 import manette.services.HapticsService;
@@ -17,7 +16,12 @@ import java.lang.reflect.Field;
  * - gère connexion/reconnexion XInput
  * - met à jour le ManetteModel
  * - gère batterie (XInput 1.4 via reflection)
- * - gère vibrations d'alertes (batterie / perte de signal)
+ * - gère vibrations d'alertes:
+ * - batterie faible
+ * - perte de liaison rover (linkLost)
+ * - obstacle trop proche (sonar) via model.isObstacleTooClose()
+ *
+ * + Lit aussi LT/RT (gâchettes) et les met dans le model (0..1)
  */
 public class ManetteController {
 
@@ -26,6 +30,12 @@ public class ManetteController {
     private static final float DEADZONE = 0.10f; // 10%
     private static final int RECONNECT_MS = 1000; // retry init toutes les 1s
     private static final int BATTERY_POLL_MS = 1000; // 1s
+
+    // Triggers: petite deadzone pour éviter d'avancer tout seul
+    private static final float TRIGGER_DEADZONE = 0.05f;
+
+    // Vibration obstacle: répétition tant que l’obstacle est proche
+    private static final int OBSTACLE_VIB_REPEAT_MS = 900;
 
     private final ManetteModel model;
     private final ManetteView view;
@@ -47,7 +57,10 @@ public class ManetteController {
     // Flags alertes (évite spam vibrations)
     private boolean lowBatteryWarned = false;
     private boolean linkLostWarned = false;
-    private boolean shockWarned = false; // placeholder
+
+    // Obstacle
+    private boolean obstacleWarned = false;
+    private long nextObstacleVibAt = 0;
 
     public ManetteController(ManetteModel model, ManetteView view) {
         this.model = model;
@@ -141,11 +154,20 @@ public class ManetteController {
         XInputAxes axes = c.getAxes();
         XInputButtons buttons = c.getButtons();
 
+        // Sticks
         model.setLeftX(applyDeadzone(axes.lx));
         model.setLeftY(applyDeadzone(axes.ly));
         model.setRightX(applyDeadzone(axes.rx));
         model.setRightY(applyDeadzone(axes.ry));
 
+        // Triggers (LT/RT) : selon versions JXInput, les champs peuvent varier ->
+        // reflection
+        float lt = readFloatField(axes, "lt", "leftTrigger", "lTrigger");
+        float rt = readFloatField(axes, "rt", "rightTrigger", "rTrigger");
+        model.setLeftTrigger(applyTriggerDeadzone(clamp01(lt)));
+        model.setRightTrigger(applyTriggerDeadzone(clamp01(rt)));
+
+        // Boutons
         boolean b = readBoolField(buttons, "b");
         boolean lb = readBoolField(buttons, "lb", "lShoulder", "leftShoulder", "lBumper", "leftBumper");
         boolean rb = readBoolField(buttons, "rb", "rShoulder", "rightShoulder", "rBumper", "rightBumper");
@@ -213,6 +235,9 @@ public class ManetteController {
         model.setRightX(0f);
         model.setRightY(0f);
 
+        model.setLeftTrigger(0f);
+        model.setRightTrigger(0f);
+
         model.setButtonB(false);
         model.setButtonLB(false);
         model.setButtonRB(false);
@@ -225,16 +250,34 @@ public class ManetteController {
         model.setVibrationLeft(0);
         model.setVibrationRight(0);
 
+        // sécurité
+        model.setLinkLost(false);
+        model.setObstacleTooClose(false);
+
         // reset flags alertes
         lowBatteryWarned = false;
         linkLostWarned = false;
-        shockWarned = false;
+
+        obstacleWarned = false;
+        nextObstacleVibAt = 0;
 
         prevB = false;
     }
 
     private float applyDeadzone(float v) {
         return (Math.abs(v) < DEADZONE) ? 0f : v;
+    }
+
+    private float clamp01(float v) {
+        if (v < 0f)
+            return 0f;
+        if (v > 1f)
+            return 1f;
+        return v;
+    }
+
+    private float applyTriggerDeadzone(float v) {
+        return (v < TRIGGER_DEADZONE) ? 0f : v;
     }
 
     private boolean readBoolField(Object obj, String... candidates) {
@@ -251,14 +294,38 @@ public class ManetteController {
         return false;
     }
 
+    private float readFloatField(Object obj, String... candidates) {
+        for (String name : candidates) {
+            try {
+                Field f = obj.getClass().getField(name);
+                if (f.getType() == float.class) {
+                    return f.getFloat(obj);
+                }
+            } catch (NoSuchFieldException ignored) {
+            } catch (Throwable ignored) {
+            }
+        }
+        return 0f;
+    }
+
     /**
      * Centralise les règles de vibration.
-     * - Batterie faible => alerte
-     * - Perte de signal (radio rover) => alerte (à brancher via
-     * model.setLinkLost(true))
-     * - Choc => placeholder commenté
+     * Priorité simple:
+     * - linkLost (important) > batterie > obstacle
      */
     private void handleVibrationAlerts() {
+        long now = System.currentTimeMillis();
+
+        // --- Perte de signal (radio rover) ---
+        if (model.isLinkLost() && !linkLostWarned) {
+            linkLostWarned = true;
+            haptics.pulseVibration(30000, 0, 400);
+            System.out.println("[MANETTE] Perte de signal (linkLost) -> vibration d'alerte.");
+        }
+        if (!model.isLinkLost()) {
+            linkLostWarned = false;
+        }
+
         // --- Batterie faible ---
         boolean battLow = (model.getBatteryLevel() == ManetteModel.BatteryLevel.LOW
                 || model.getBatteryLevel() == ManetteModel.BatteryLevel.EMPTY);
@@ -272,26 +339,28 @@ public class ManetteController {
             lowBatteryWarned = false;
         }
 
-        // --- Perte de signal (radio rover) ---
-        // À brancher quand vous aurez un module radio:
-        // - si le rover ne répond plus / RSSI à 0 => model.setLinkLost(true)
-        if (model.isLinkLost() && !linkLostWarned) {
-            linkLostWarned = true;
-            haptics.pulseVibration(30000, 0, 400);
-            System.out.println("[MANETTE] Perte de signal (linkLost) -> vibration d'alerte.");
-        }
-        if (!model.isLinkLost()) {
-            linkLostWarned = false;
+        // --- Obstacle trop proche (sonar) ---
+        // On ne vibre pas “obstacle” si linkLost est actif (sinon ça spam / mélange).
+        boolean obstacle = model.isObstacleTooClose();
+        if (!model.isLinkLost() && obstacle) {
+            if (!obstacleWarned) {
+                obstacleWarned = true;
+                nextObstacleVibAt = 0; // vib immédiate
+                System.out.println("[MANETTE] Obstacle proche -> vibration d'alerte.");
+            }
+            if (now >= nextObstacleVibAt) {
+                nextObstacleVibAt = now + OBSTACLE_VIB_REPEAT_MS;
+                // pattern court “danger” (tu peux ajuster les valeurs)
+                haptics.pulseVibration(0, 35000, 180);
+            }
+        } else {
+            obstacleWarned = false;
+            nextObstacleVibAt = 0;
         }
 
-        // --- Choc détecté (placeholder) ---
-        // boolean shockDetected = false; // TODO: brancher sur IMU/accéléro plus tard
-        // if (shockDetected && !shockWarned) {
-        // shockWarned = true;
-        // haptics.pulseVibration(0, 30000, 200);
-        // haptics.pulseVibration(0, 30000, 200);
-        // System.out.println("[MANETTE] Choc détecté -> vibration d'alerte.");
-        // }
-        // if (!shockDetected) shockWarned = false;
+        // --- Choc IMU (placeholder) ---
+        // TODO: quand vous aurez l'IMU:
+        // - ajouter un flag model.setShockDetected(true/false)
+        // - et déclencher une vibration spécifique ici.
     }
 }

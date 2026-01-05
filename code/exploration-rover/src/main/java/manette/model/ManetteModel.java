@@ -19,18 +19,21 @@ public class ManetteModel {
     // ===== État connexion =====
     private volatile boolean connected;
 
-    // ===== Axes =====
+    // ===== Sticks =====
     private volatile float leftX;
     private volatile float leftY;
     private volatile float rightX;
     private volatile float rightY;
+
+    // ===== Gâchettes (0..1) =====
+    private volatile float leftTrigger; // LT
+    private volatile float rightTrigger; // RT
 
     // ===== Boutons utiles =====
     private volatile boolean buttonB;
     private volatile boolean buttonLB;
     private volatile boolean buttonRB;
 
-    // Mode vitesse “logique” (ex: lié à LB)
     private volatile ModeVitesse modeVitesse = ModeVitesse.NORMALE;
 
     // ===== Batterie =====
@@ -41,19 +44,17 @@ public class ManetteModel {
     private volatile int vibrationLeft;
     private volatile int vibrationRight;
 
-    // ===== Signal radio (à brancher plus tard) =====
-    // - linkLost: vrai = perte de liaison rover/radio (pas la manette
-    // USB/Bluetooth)
-    // - linkQuality: 0..1 (optionnel), -1 = inconnu
+    // ===== Liaison rover/radio =====
     private volatile boolean linkLost = false;
     private volatile float linkQuality = -1f;
 
+    // ===== Alerte obstacle =====
+    private volatile boolean obstacleTooClose = false;
+
     // ===== Événements “edge” =====
-    // On les consomme depuis le Main (évite de stocker prevB partout).
     private final AtomicBoolean emergencyStopClick = new AtomicBoolean(false);
 
     // ===== Get / Set =====
-
     public boolean isConnected() {
         return connected;
     }
@@ -92,6 +93,22 @@ public class ManetteModel {
 
     public void setRightY(float rightY) {
         this.rightY = rightY;
+    }
+
+    public float getLeftTrigger() {
+        return leftTrigger;
+    }
+
+    public void setLeftTrigger(float leftTrigger) {
+        this.leftTrigger = leftTrigger;
+    }
+
+    public float getRightTrigger() {
+        return rightTrigger;
+    }
+
+    public void setRightTrigger(float rightTrigger) {
+        this.rightTrigger = rightTrigger;
     }
 
     public boolean isButtonB() {
@@ -174,18 +191,19 @@ public class ManetteModel {
         this.linkQuality = linkQuality;
     }
 
-    // ===== Event: arrêt d'urgence (clic B) =====
+    public boolean isObstacleTooClose() {
+        return obstacleTooClose;
+    }
 
-    /** Appelé par le controller quand il détecte un clic (edge) sur B. */
+    public void setObstacleTooClose(boolean obstacleTooClose) {
+        this.obstacleTooClose = obstacleTooClose;
+    }
+
+    // ===== Event: arrêt d'urgence (clic B) =====
     public void fireEmergencyStopClick() {
         emergencyStopClick.set(true);
     }
 
-    /**
-     * Appelé par ton Main: retourne true UNE FOIS par clic.
-     * Exemple:
-     * if (pad.consumeEmergencyStopClick()) rover.emergencyStop();
-     */
     public boolean consumeEmergencyStopClick() {
         return emergencyStopClick.getAndSet(false);
     }

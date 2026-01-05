@@ -1,14 +1,20 @@
 package app;
 
+import common.EventBus;
 import manette.controller.ManetteController;
 import manette.model.ManetteModel;
 import manette.view.ManetteView;
-
 import rover.controller.RoverController;
 import rover.model.RoverModel;
 import rover.services.Connection;
 import rover.services.MotorService;
 import rover.view.RoverView;
+import sonar.model.SonarState;
+import sonar.services.SonarService;
+import sonar.view.SonarView;
+
+import java.lang.reflect.Method;
+import java.util.function.Consumer;
 
 public class Main {
 
@@ -16,34 +22,84 @@ public class Main {
     private static final double MAX_CMD = 1.0; // -1..1
     private static final int ROVER_RECONNECT_MS = 2000;
 
-    public static void main(String[] args) throws Exception {
+    // ===== Alerte SONAR / Distance =====
+    private static final double OBSTACLE_ON_MM = 250.0;
+    private static final double OBSTACLE_OFF_DELTA_MM = 60.0;
+    private static final long SONAR_STALE_MS = 1200;
 
-        // ===== CONFIG ROVER =====
+    private static volatile double latestDistanceMm = Double.NaN;
+    private static volatile long latestDistanceAtMs = 0;
+
+    // Pour debug console SonarView
+    private static volatile SonarState latestSonarState = null;
+
+    public static void main(String[] args) {
+
+        // Args: <ip> <port> <serverName>
         String ip = (args.length >= 1) ? args[0] : "10.18.1.127";
         int port = (args.length >= 2) ? Integer.parseInt(args[1]) : 5661;
+        String serverName = (args.length >= 3) ? args[2] : "ROVERG1";
 
-        Connection connection = new Connection(ip, port);
+        // ===== CONFIG ROVER =====
+        Connection connection = new Connection(serverName, ip, port);
         MotorService motorService = new MotorService(connection);
-        motorService.setDebug(true); // pas de "debug: true" en Java
-
-        // Si besoin (moteur inversé):
-        // motorService.setInversions(true, false);
+        motorService.setDebug(true);
 
         RoverModel roverModel = new RoverModel(connection, motorService);
         RoverController rover = new RoverController(roverModel);
-
-        RoverView roverView = new RoverView(250); // ✅ pas de "periodMs: 250" en Java
+        RoverView roverView = new RoverView(250);
 
         // ===== CONFIG MANETTE =====
         ManetteModel padModel = new ManetteModel();
         ManetteView padView = new ManetteView();
         ManetteController pad = new ManetteController(padModel, padView);
 
+        // ===== SONAR =====
+        // HubPort sonar: adapte si besoin (tu avais 5)
+        SonarService sonar = new SonarService(serverName, ip, port, 5);
+        SonarView sonarView = new SonarView(250);
+        sonar.start();
+
+        // ===== EventBus: récup distance + état sonar pour debug =====
+        Consumer<Object> sonarSubscriber = payload -> {
+            // 1) Si on reçoit directement un SonarState => on le garde pour affichage
+            if (payload instanceof SonarState s) {
+                latestSonarState = s;
+
+                // Distance pour l'alerte obstacle
+                double d = s.distanceMm();
+                if (!Double.isNaN(d) && d > 0) {
+                    latestDistanceMm = d;
+                    latestDistanceAtMs = System.currentTimeMillis();
+                }
+                return;
+            }
+
+            // 2) Sinon on tente d'extraire une distance (si quelqu'un publie un Number,
+            // etc.)
+            Double d = extractDistanceMm(payload);
+            if (d != null) {
+                latestDistanceMm = d;
+                latestDistanceAtMs = System.currentTimeMillis();
+            }
+        };
+
+        EventBus.subscribe("sonar.update", sonarSubscriber);
+
+        // (Optionnel) si votre distance vient aussi de capteurs.update
+        Consumer<Object> capteursSubscriber = payload -> {
+            Double d = extractDistanceMm(payload);
+            if (d != null) {
+                latestDistanceMm = d;
+                latestDistanceAtMs = System.currentTimeMillis();
+            }
+        };
+        EventBus.subscribe("capteurs.update", capteursSubscriber);
+
         // ===== START =====
         pad.startDebugLoop();
         tryConnectRover(rover);
 
-        // Stop propre
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
                 rover.stop();
@@ -57,10 +113,25 @@ public class Main {
                 pad.stop();
             } catch (Exception ignored) {
             }
+            try {
+                sonar.stop();
+            } catch (Exception ignored) {
+            }
+
+            try {
+                EventBus.unsubscribe("sonar.update", sonarSubscriber);
+            } catch (Exception ignored) {
+            }
+            try {
+                EventBus.unsubscribe("capteurs.update", capteursSubscriber);
+            } catch (Exception ignored) {
+            }
+
             System.out.println("[APP] Shutdown.");
         }));
 
         long nextRoverReconnectAt = 0;
+        boolean obstacleActive = false;
 
         // ===== TELEOP LOOP =====
         while (true) {
@@ -69,14 +140,20 @@ public class Main {
             // --- Debug rover (throttlé dans RoverView) ---
             roverView.render(roverModel);
 
+            // --- Debug sonar (throttlé dans SonarView) ---
+            sonarView.renderConsole(latestSonarState);
+
             // --- Manette pas connectée -> stop rover ---
             if (!padModel.isConnected()) {
                 try {
                     rover.stop();
                 } catch (Exception ignored) {
                 }
-                // pas de vibration possible si manette déconnectée, mais on remet l'état propre
+
                 padModel.setLinkLost(false);
+                padModel.setObstacleTooClose(false);
+                obstacleActive = false;
+
                 sleep(TELEOP_LOOP_MS);
                 continue;
             }
@@ -85,11 +162,15 @@ public class Main {
             boolean roverLinkOk = roverModel.isConnected();
             padModel.setLinkLost(!roverLinkOk);
 
-            // si rover down -> tentative reco toutes les X secondes
             if (!roverLinkOk && now >= nextRoverReconnectAt) {
                 nextRoverReconnectAt = now + ROVER_RECONNECT_MS;
                 tryConnectRover(rover);
             }
+
+            // --- SONAR: obstacle trop proche => vibration côté manette ---
+            boolean obstacleTooClose = computeObstacleTooClose(now, obstacleActive);
+            obstacleActive = obstacleTooClose;
+            padModel.setObstacleTooClose(obstacleTooClose);
 
             // --- B (clic) = E-STOP toggle (ON/OFF) ---
             if (padModel.consumeEmergencyStopClick()) {
@@ -99,29 +180,68 @@ public class Main {
                     rover.emergencyStop();
             }
 
-            // --- Mode vitesse (déjà géré dans ManetteController via LB) ---
+            // --- Mode vitesse (LB = lent) ---
             rover.setSpeedMode(
                     padModel.getModeVitesse() == ManetteModel.ModeVitesse.LENTE
                             ? RoverModel.SpeedMode.SLOW
                             : RoverModel.SpeedMode.NORMAL);
 
-            // --- Mapping sticks -> moteurs ---
-            double throttle = padModel.getRightY(); // vitesse (Y inversé)
-            double turn = padModel.getLeftX(); // direction
+            // --- Mapping gâchettes -> vitesse ; LeftX -> direction ---
+            double rt = padModel.getRightTrigger(); // 0..1
+            double lt = padModel.getLeftTrigger(); // 0..1
+            double throttle = clamp(rt - lt, -MAX_CMD, MAX_CMD);
+
+            double turn = padModel.getLeftX();
 
             double left = clamp(throttle + turn, -MAX_CMD, MAX_CMD);
             double right = clamp(throttle - turn, -MAX_CMD, MAX_CMD);
 
             rover.applyDriveCommand(left, right);
 
-            // TODO (plus tard):
-            // - si un choc est détecté (IMU), tu pourras faire:
-            // padModel.setLinkLost(true/false) ? NON
-            // -> plutôt ajouter un flag "shockDetected" dans le model et vibrer côté
-            // controller.
-
             sleep(TELEOP_LOOP_MS);
         }
+    }
+
+    private static boolean computeObstacleTooClose(long now, boolean wasActive) {
+        if (now - latestDistanceAtMs > SONAR_STALE_MS)
+            return false;
+
+        double d = latestDistanceMm;
+        if (Double.isNaN(d) || d <= 0)
+            return false;
+
+        if (!wasActive)
+            return d <= OBSTACLE_ON_MM;
+        return d <= (OBSTACLE_ON_MM + OBSTACLE_OFF_DELTA_MM);
+    }
+
+    private static Double extractDistanceMm(Object payload) {
+        if (payload == null)
+            return null;
+
+        if (payload instanceof Number n)
+            return n.doubleValue();
+
+        Double d = invokeDouble(payload, "distanceMm");
+        if (d != null)
+            return d;
+
+        d = invokeDouble(payload, "getDistanceMm");
+        if (d != null)
+            return d;
+
+        return null;
+    }
+
+    private static Double invokeDouble(Object obj, String methodName) {
+        try {
+            Method m = obj.getClass().getMethod(methodName);
+            Object v = m.invoke(obj);
+            if (v instanceof Number n)
+                return n.doubleValue();
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     private static void tryConnectRover(RoverController rover) {

@@ -10,8 +10,6 @@ import com.phidget22.PhidgetException;
  */
 public class Connection {
 
-    private static final String SERVER_NAME = "ROVERG1";
-
     // D'après Control Panel:
     // DCC1003 branché sur Hub Port 4
     // moteurs: channel 0 (motor 0) et channel 1 (motor 1)
@@ -19,6 +17,7 @@ public class Connection {
     private static final int LEFT_MOTOR_CHANNEL = 0;
     private static final int RIGHT_MOTOR_CHANNEL = 1;
 
+    private final String serverName;
     private final String ip;
     private final int port;
 
@@ -26,7 +25,8 @@ public class Connection {
     private DCMotor leftMotor;
     private DCMotor rightMotor;
 
-    public Connection(String ip, int port) {
+    public Connection(String serverName, String ip, int port) {
+        this.serverName = serverName;
         this.ip = ip;
         this.port = port;
     }
@@ -35,14 +35,14 @@ public class Connection {
         if (connected)
             return;
 
-        // Si jamais un ancien server du même nom traîne (relance app), on nettoie.
+        // Nettoie un ancien server du même nom (relance app)
         try {
-            Net.removeServer(SERVER_NAME);
+            Net.removeServer(serverName);
         } catch (Exception ignored) {
         }
 
-        // Déclare le serveur Phidget Network (le "publish" doit être ON côté hub)
-        Net.addServer(SERVER_NAME, ip, port, "", 0);
+        // Déclare le serveur Phidget Network (publish ON côté hub)
+        Net.addServer(serverName, ip, port, "", 0);
 
         leftMotor = openMotor(MOTOR_HUB_PORT, LEFT_MOTOR_CHANNEL);
         rightMotor = openMotor(MOTOR_HUB_PORT, RIGHT_MOTOR_CHANNEL);
@@ -50,7 +50,7 @@ public class Connection {
         safeStop();
         connected = true;
 
-        System.out.println("[ROVER] Connecté (Phidget network + moteurs ouverts).");
+        System.out.println("[ROVER] Connecté (server=" + serverName + " ip=" + ip + ":" + port + ")");
     }
 
     public synchronized void disconnect() {
@@ -77,7 +77,7 @@ public class Connection {
         rightMotor = null;
 
         try {
-            Net.removeServer(SERVER_NAME);
+            Net.removeServer(serverName);
         } catch (Exception ignored) {
         }
 
@@ -117,19 +117,21 @@ public class Connection {
 
     private DCMotor openMotor(int hubPort, int channel) throws PhidgetException {
         DCMotor m = new DCMotor();
-        m.setServerName(SERVER_NAME);
+        m.setServerName(serverName);
         m.setHubPort(hubPort);
         m.setChannel(channel);
 
-        // IMPORTANT:
-        // NE PAS appeler setIsHubPortDevice(true) ici -> cause "Invalid Argument" sur
-        // DCMotor.
+        // IMPORTANT: ne pas appeler setIsHubPortDevice(true) ici
         m.open(5000);
         return m;
     }
 
     private double clamp(double v) {
         return Math.max(-1.0, Math.min(1.0, v));
+    }
+
+    public String getServerName() {
+        return serverName;
     }
 
     public String getIp() {
