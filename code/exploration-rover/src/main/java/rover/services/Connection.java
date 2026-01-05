@@ -11,24 +11,24 @@ import com.phidget22.PhidgetException;
 public class Connection {
 
     // D'après Control Panel:
-    // DCC1003 branché sur Hub Port 4
     // moteurs: channel 0 (motor 0) et channel 1 (motor 1)
-    private static final int MOTOR_HUB_PORT = 4;
     private static final int LEFT_MOTOR_CHANNEL = 0;
     private static final int RIGHT_MOTOR_CHANNEL = 1;
 
     private final String serverName;
     private final String ip;
     private final int port;
+    private final int motorHubPort;
 
     private boolean connected = false;
     private DCMotor leftMotor;
     private DCMotor rightMotor;
 
-    public Connection(String serverName, String ip, int port) {
+    public Connection(String serverName, String ip, int port, int motorHubPort) {
         this.serverName = serverName;
         this.ip = ip;
         this.port = port;
+        this.motorHubPort = motorHubPort;
     }
 
     public synchronized void connect() throws PhidgetException {
@@ -44,8 +44,8 @@ public class Connection {
         // Déclare le serveur Phidget Network (publish ON côté hub)
         Net.addServer(serverName, ip, port, "", 0);
 
-        leftMotor = openMotor(MOTOR_HUB_PORT, LEFT_MOTOR_CHANNEL);
-        rightMotor = openMotor(MOTOR_HUB_PORT, RIGHT_MOTOR_CHANNEL);
+        leftMotor = openMotor(motorHubPort, LEFT_MOTOR_CHANNEL);
+        rightMotor = openMotor(motorHubPort, RIGHT_MOTOR_CHANNEL);
 
         safeStop();
         connected = true;

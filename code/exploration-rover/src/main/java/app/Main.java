@@ -36,12 +36,14 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = (args.length >= 1) ? args[0] : "10.18.1.127";
-        int port = (args.length >= 2) ? Integer.parseInt(args[1]) : 5661;
-        String serverName = (args.length >= 3) ? args[2] : "ROVERG1";
+        String ip = "10.18.1.53"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur le rover !!
+        int port = 5661;
+        String serverName = "hub5000";
+        int motorHubPort = 5;
+        int sonarHubPort = 3;
 
         // ===== CONFIG ROVER =====
-        Connection connection = new Connection(serverName, ip, port);
+        Connection connection = new Connection(serverName, ip, port,motorHubPort);
         MotorService motorService = new MotorService(connection);
         motorService.setDebug(true);
 
@@ -56,7 +58,7 @@ public class Main {
 
         // ===== SONAR =====
         // HubPort sonar: adapte si besoin (tu avais 5)
-        SonarService sonar = new SonarService(serverName, ip, port, 5);
+        SonarService sonar = new SonarService(serverName, ip, port, sonarHubPort);
         SonarView sonarView = new SonarView(250);
         sonar.start();
 
