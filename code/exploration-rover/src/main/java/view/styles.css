@@ -102,6 +102,13 @@
     -fx-font-weight: 700;
 }
 
+.sensorMessage {
+    -fx-text-fill: #c8f7e2;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-line-spacing: 2px;
+}
+
 .bigValue {
     -fx-text-fill: #e9fff4;
     -fx-font-size: 34px;
@@ -140,7 +147,7 @@
 }
 
 .sonarRover {
-    -fx-fill: #6b6b6b;      /* gris */
+    -fx-fill: #2e2e2e;      /* gris */
     -fx-stroke: #3a3a3a;
     -fx-stroke-width: 1.2;
     -fx-arc-width: 6;

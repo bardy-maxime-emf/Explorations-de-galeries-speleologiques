@@ -1,95 +1,60 @@
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
 import javafx.stage.Stage;
+//import rover.controller.IControllerForView;
 
-public class View implements IView, Initializable {
+import java.io.IOException;
+import java.net.URL;
+import java.util.ResourceBundle;
 
-    private final IControllerForView controller;
+public class View implements Initializable {
 
-    @FXML private Canvas sonarCanvas;
-    @FXML private Canvas xAxisCanvas;
+   // private IControllerForView controller; // pas final pour setter
 
-    private double xMin = 0;      // m
-    private double xMax = 50;     // m (portée)
-    private double majorStep = 5; // tick majeur tous les 5m
-    private double minorStep = 1; // tick mineur tous les 1m
 
-    public View(IControllerForView controller) {
-        this.controller = controller;
-    }
+    // Constructeur avec ton contrôleur MVC
+   // public View(IControllerForView controller) {
+    //  this.controller = controller;
+    //}
 
-    @Override
+    /**
+     * Méthode de démarrage de l'application JavaFX
+     */
     public void start() {
-        Platform.startup( () -> {
+        Platform.startup(() -> {
             try {
                 Stage mainStage = new Stage();
-                FXMLLoader fxmlLoader = new FXMLLoader( getClass().getResource( "View.fxml" ) );
-                fxmlLoader.setControllerFactory( type -> {
-                    return this;
-                } );
-                Parent root = ( Parent ) fxmlLoader.load();
-                Scene principalScene = new Scene( root );
-                mainStage.setScene( principalScene );
-                mainStage.setTitle( "Application Hello World MVC" );
+                FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
+
+                // On passe cette instance comme contrôleur
+                fxmlLoader.setControllerFactory(type -> this);
+
+                // Charge le FXML et injecte les @FXML
+                Parent root = fxmlLoader.load();
+
+
+                Scene principalScene = new Scene(root);
+                mainStage.setScene(principalScene);
+                mainStage.setTitle("Application Hello World MVC");
                 mainStage.show();
-            }
-            catch ( IOException ex ) {
+            } catch (IOException ex) {
                 ex.printStackTrace();
                 Platform.exit();
             }
-        } );
+        });
     }
+
+    
 
     @Override
-    public void initialize( URL url, ResourceBundle rb ) {
-
-    // Redraw si redimensionnement
-    xAxisCanvas.widthProperty().addListener((obs, o, n) -> drawXAxis());
-    xAxisCanvas.heightProperty().addListener((obs, o, n) -> drawXAxis());
-
-    // Si ton layout redimensionne le canvas : bind la largeur à son parent
-    // (à adapter selon ton conteneur)
-    // xAxisCanvas.widthProperty().bind(sonarContainer.widthProperty());
-
-    drawXAxis();
+    public void initialize(URL url, ResourceBundle rb) {
+        // On ne touche pas encore aux Canvas ici, car start() gère déjà
     }
-
-    private void drawXAxis() {
-    var gc = xAxisCanvas.getGraphicsContext2D();
-    double w = xAxisCanvas.getWidth();
-    double h = xAxisCanvas.getHeight();
-
-    gc.clearRect(0, 0, w, h);
-
-    double paddingLeft = 12;
-    double paddingRight = 12;
-    double axisY = h - 8; // ligne près du bas
-
-    // Ligne de base de l'axe
-    gc.strokeLine(paddingLeft, axisY, w - paddingRight, axisY);
-
-    // Conversion m -> pixel
-    double usableW = (w - paddingLeft - paddingRight);
-    double toXpx = usableW / (xMax - xMin);
-
-    // Ticks mineurs
-    for (double v = xMin; v <= xMax + 1e-9; v += minorStep) {
-        double x = paddingLeft + (v - xMin) * toXpx;
-        boolean isMajor = Math.abs((v / majorStep) - Math.round(v / majorStep)) < 1e-9;
-
-        double tickH = isMajor ? 10 : 6;
-        gc.strokeLine(x, axisY, x, axisY - tickH);
-
-        if (isMajor) {
-            String label = String.format("%.0f", v);
-            gc.fillText(label, x - 6, axisY - 12); // petite correction centrage
-        }
-    }
-
-    // Option : unité à droite
-    gc.fillText("m", w - paddingRight - 10, axisY - 12);
-}
 
 }

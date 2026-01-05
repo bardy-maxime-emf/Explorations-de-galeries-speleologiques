@@ -1,5 +1,3 @@
-package views;
-
-public interface Iview {
+public interface IView {
     void start();
 }
