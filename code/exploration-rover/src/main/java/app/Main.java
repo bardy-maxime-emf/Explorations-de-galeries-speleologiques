@@ -9,6 +9,7 @@ import rover.model.RoverModel;
 import rover.services.Connection;
 import rover.services.MotorService;
 import rover.view.RoverView;
+import view.View;
 import sonar.model.SonarState;
 import sonar.services.SonarService;
 import sonar.view.SonarView;
@@ -56,6 +57,8 @@ public class Main {
         RoverModel roverModel = new RoverModel(connection, motorService);
         RoverController rover = new RoverController(roverModel);
         RoverView roverView = new RoverView(250);
+        // Vue IHM JavaFX (View.fxml). Démarre le FX Application Thread.
+        new View().start();
 
         // ===== CONFIG MANETTE =====
         ManetteModel padModel = new ManetteModel();
@@ -216,7 +219,11 @@ public class Main {
             double lt = padModel.getLeftTrigger(); // 0..1
             double throttle = clamp(rt - lt, -MAX_CMD, MAX_CMD);
 
-            double turn = padModel.getLeftX();
+            // Rotation: courbe douce + gain + moins de pivot à haute vitesse
+            double turnRaw = padModel.getLeftX(); // -1..1
+            double turn = Math.copySign(turnRaw * turnRaw, turnRaw); // quadratique pour finesse autour de 0
+            turn *= 1.0; // gain rotation (encore plus franc)
+            turn *= (0.7 + 0.3 * (1 - Math.abs(throttle))); // atténuation légère à haute vitesse
 
             double left = clamp(throttle + turn, -MAX_CMD, MAX_CMD);
             double right = clamp(throttle - turn, -MAX_CMD, MAX_CMD);
