@@ -16,6 +16,10 @@ import sonar.view.SonarView;
 import java.lang.reflect.Method;
 import java.util.function.Consumer;
 
+import capteurs.controller.HumidityController;
+import capteurs.services.HumidityService;
+import capteurs.view.HumidityView;
+
 public class Main {
 
     private static final int TELEOP_LOOP_MS = 50; // 20 FPS
@@ -36,14 +40,16 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.53"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur le rover !!
+        String ip = "10.18.1.64"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+                                  // le rover !!
         int port = 5661;
-        String serverName = "hub5000";
-        int motorHubPort = 5;
+        String serverName = "test2";
+        int motorHubPort = 4;
         int sonarHubPort = 3;
+        int temperaturePort = 2;
 
         // ===== CONFIG ROVER =====
-        Connection connection = new Connection(serverName, ip, port,motorHubPort);
+        Connection connection = new Connection(serverName, ip, port, motorHubPort);
         MotorService motorService = new MotorService(connection);
         motorService.setDebug(true);
 
@@ -61,6 +67,12 @@ public class Main {
         SonarService sonar = new SonarService(serverName, ip, port, sonarHubPort);
         SonarView sonarView = new SonarView(250);
         sonar.start();
+
+        // ===== Capteur température =====
+        HumidityService humService = new HumidityService(serverName, ip, port, temperaturePort);
+        HumidityController humController = new HumidityController();
+        HumidityView humView = new HumidityView(500);
+        humService.start();
 
         // ===== EventBus: récup distance + état sonar pour debug =====
         Consumer<Object> sonarSubscriber = payload -> {
@@ -108,6 +120,10 @@ public class Main {
             } catch (Exception ignored) {
             }
             try {
+                humService.stop();
+            } catch (Exception ignored) {
+            }
+            try {
                 rover.disconnect();
             } catch (Exception ignored) {
             }
@@ -128,6 +144,10 @@ public class Main {
                 EventBus.unsubscribe("capteurs.update", capteursSubscriber);
             } catch (Exception ignored) {
             }
+            try {
+                humController.dispose();
+            } catch (Exception ignored) {
+            }
 
             System.out.println("[APP] Shutdown.");
         }));
@@ -144,6 +164,9 @@ public class Main {
 
             // --- Debug sonar (throttlé dans SonarView) ---
             sonarView.renderConsole(latestSonarState);
+
+            // --- Debug humidité/température ---
+            humView.renderConsole(humController.getLatestState());
 
             // --- Manette pas connectée -> stop rover ---
             if (!padModel.isConnected()) {
