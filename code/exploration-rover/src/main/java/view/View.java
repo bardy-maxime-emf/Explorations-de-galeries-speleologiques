@@ -11,6 +11,7 @@ import javafx.scene.shape.Ellipse;
 import javafx.stage.Stage;
 import sonar.model.SonarState;
 import capteurs.model.HumidityState;
+import capteurs.model.TemperatureStatus;
 
 import java.io.IOException;
 import java.net.URL;
@@ -27,15 +28,22 @@ public class View implements Initializable, IView {
     private static final double SONAR_MAX_MM = 2000.0; // 2 m
     // Ancrages visuels issus du FXML (Y en pixels pour min/max)
     private static final double SONAR_Y_MIN = 400.0; // correspond à min (40 mm)
-    private static final double SONAR_Y_MAX = 50.0;  // correspond à max (2000 mm)
+    private static final double SONAR_Y_MAX = 50.0; // correspond à max (2000 mm)
 
-    @FXML private Label lblTemperature;
-    @FXML private Label lblHumidite;
-    @FXML private Label lblMessage;
-    @FXML private Label lblSonarDistance;
-    @FXML private Label lblSonarStatus;
-    @FXML private Label lblStatusPill;
-    @FXML private Ellipse sonarDot;
+    @FXML
+    private Label lblTemperature;
+    @FXML
+    private Label lblHumidite;
+    @FXML
+    private Label lblMessage;
+    @FXML
+    private Label lblSonarDistance;
+    @FXML
+    private Label lblSonarStatus;
+    @FXML
+    private Label lblStatusPill;
+    @FXML
+    private Ellipse sonarDot;
 
     /**
      * Démarre la scène JavaFX dans le FX Application Thread.
@@ -72,7 +80,8 @@ public class View implements Initializable, IView {
      * Met à jour l'IHM (appelée depuis le thread FX via Platform.runLater).
      */
     public void updateUi(UiSnapshot snap) {
-        if (snap == null) return;
+        if (snap == null)
+            return;
 
         // Rover status
         if (lblStatusPill != null) {
@@ -94,7 +103,8 @@ public class View implements Initializable, IView {
         } else {
             lblSonarDistance.setText("—");
             lblSonarStatus.setText("Sonar: ?");
-            if (sonarDot != null) sonarDot.setVisible(false);
+            if (sonarDot != null)
+                sonarDot.setVisible(false);
         }
 
         // Humidité / température
@@ -102,9 +112,19 @@ public class View implements Initializable, IView {
         if (h != null) {
             String t = Double.isNaN(h.temperatureCelsius()) ? "—" : String.format("%.1f", h.temperatureCelsius());
             String hum = Double.isNaN(h.humidityPercent()) ? "—" : String.format("%.1f", h.humidityPercent());
-            lblTemperature.setText(t);
+            if (h.temperatureStatus() == TemperatureStatus.TOO_HIGH) {
+                lblMessage.setText("⚠ Température trop élevée");
+                lblMessage.setStyle("-fx-text-fill: red;");
+                lblTemperature.setText("—");
+            } else if (h.temperatureStatus() == TemperatureStatus.TOO_LOW) {  
+                lblMessage.setText("⚠ Température trop basse");
+                lblMessage.setStyle("-fx-text-fill: red;");
+                lblTemperature.setText("—");
+            } else {
+                lblTemperature.setText(t);
+                lblMessage.setText(h.lastError() == null ? "" : h.lastError());
+            }
             lblHumidite.setText(hum);
-            lblMessage.setText(h.lastError() == null ? "" : h.lastError());
         } else {
             lblTemperature.setText("—");
             lblHumidite.setText("—");
@@ -116,7 +136,8 @@ public class View implements Initializable, IView {
      * Positionne/affiche le point sonar sur l'échelle (0..120 mm).
      */
     private void updateSonarDot(SonarState s) {
-        if (sonarDot == null) return;
+        if (sonarDot == null)
+            return;
         if (s == null || !s.attached() || Double.isNaN(s.distanceMm())) {
             sonarDot.setVisible(false);
             return;

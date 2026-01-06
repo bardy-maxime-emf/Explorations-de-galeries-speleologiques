@@ -1,6 +1,4 @@
-﻿
-
-import common.EventBus;
+﻿import common.EventBus;
 import javafx.application.Platform;
 import manette.controller.ManetteController;
 import manette.model.ManetteModel;
@@ -43,11 +41,11 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.53"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+        String ip = "10.18.1.85"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
                                   // le rover !!
         int port = 5661;
-        String serverName = "host5000";
-        int motorHubPort = 4;
+        String serverName = "jl";
+        int motorHubPort = 5;
         int sonarHubPort = 3;
         int temperaturePort = 2;
 

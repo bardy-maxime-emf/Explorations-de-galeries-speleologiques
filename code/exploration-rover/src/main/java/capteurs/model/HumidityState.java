@@ -6,9 +6,10 @@ package capteurs.model;
  * temperatureCelsius : °C
  */
 public record HumidityState(
-        double humidityPercent,
-        double temperatureCelsius,
-        boolean attached,
-        long timestampMs,
-        String lastError) {
+                double humidityPercent,
+                double temperatureCelsius,
+                boolean attached,
+                long timestampMs,
+                String lastError,
+                TemperatureStatus temperatureStatus) {
 }
