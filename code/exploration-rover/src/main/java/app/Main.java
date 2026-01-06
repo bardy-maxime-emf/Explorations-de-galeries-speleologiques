@@ -1,6 +1,7 @@
-package app;
+﻿
 
 import common.EventBus;
+import javafx.application.Platform;
 import manette.controller.ManetteController;
 import manette.model.ManetteModel;
 import manette.view.ManetteView;
@@ -9,10 +10,11 @@ import rover.model.RoverModel;
 import rover.services.Connection;
 import rover.services.MotorService;
 import rover.view.RoverView;
-import view.View;
 import sonar.model.SonarState;
 import sonar.services.SonarService;
 import sonar.view.SonarView;
+import view.UiSnapshot;
+import view.View;
 
 import java.lang.reflect.Method;
 import java.util.function.Consumer;
@@ -41,10 +43,10 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.64"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+        String ip = "10.18.1.53"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
                                   // le rover !!
         int port = 5661;
-        String serverName = "test2";
+        String serverName = "host5000";
         int motorHubPort = 4;
         int sonarHubPort = 3;
         int temperaturePort = 2;
@@ -58,7 +60,8 @@ public class Main {
         RoverController rover = new RoverController(roverModel);
         RoverView roverView = new RoverView(250);
         // Vue IHM JavaFX (View.fxml). Démarre le FX Application Thread.
-        new View().start();
+        View ui = new View();
+        ui.start();
 
         // ===== CONFIG MANETTE =====
         ManetteModel padModel = new ManetteModel();
@@ -157,6 +160,7 @@ public class Main {
 
         long nextRoverReconnectAt = 0;
         boolean obstacleActive = false;
+        long nextUiUpdateAt = 0;
 
         // ===== TELEOP LOOP =====
         while (true) {
@@ -170,6 +174,20 @@ public class Main {
 
             // --- Debug humidité/température ---
             humView.renderConsole(humController.getLatestState());
+
+            // --- Mise � jour IHM JavaFX (toutes ~200 ms) ---
+            if (now >= nextUiUpdateAt) {
+                nextUiUpdateAt = now + 200;
+                UiSnapshot snap = new UiSnapshot(
+                        roverModel.isConnected(),
+                        roverModel.getSpeedMode(),
+                        roverModel.isEmergencyStop(),
+                        roverModel.getLeftCmd(),
+                        roverModel.getRightCmd(),
+                        latestSonarState,
+                        humController.getLatestState());
+                Platform.runLater(() -> ui.updateUi(snap));
+            }
 
             // --- Manette pas connectée -> stop rover ---
             if (!padModel.isConnected()) {
@@ -219,15 +237,17 @@ public class Main {
             double lt = padModel.getLeftTrigger(); // 0..1
             double throttle = clamp(rt - lt, -MAX_CMD, MAX_CMD);
 
-            // Rotation: courbe douce + gain + moins de pivot à haute vitesse
+            // Rotation: deadzone + courbe cubique + gain plus doux + atténuation avec la vitesse
             double turnRaw = padModel.getLeftX(); // -1..1
-            double turn = Math.copySign(turnRaw * turnRaw, turnRaw); // quadratique pour finesse autour de 0
-            turn *= 1.0; // gain rotation (encore plus franc)
-            turn *= (0.7 + 0.3 * (1 - Math.abs(throttle))); // atténuation légère à haute vitesse
+            if (Math.abs(turnRaw) < 0.12)
+                turnRaw = 0.0;
+            double turn = turnRaw * Math.abs(turnRaw) * Math.abs(turnRaw); // cubique pour plus de finesse
+            turn *= 0.8; // gain rotation global plus doux
+            turn *= (0.5 + 0.5 * (1 - Math.abs(throttle))); // réduit la rotation quand on roule vite
+            turn = clamp(turn, -0.8, 0.8); // évite les pivots brutaux
 
             double left = clamp(throttle + turn, -MAX_CMD, MAX_CMD);
             double right = clamp(throttle - turn, -MAX_CMD, MAX_CMD);
-
             rover.applyDriveCommand(left, right);
 
             sleep(TELEOP_LOOP_MS);
@@ -296,3 +316,5 @@ public class Main {
         return Math.max(min, Math.min(max, v));
     }
 }
+
+
