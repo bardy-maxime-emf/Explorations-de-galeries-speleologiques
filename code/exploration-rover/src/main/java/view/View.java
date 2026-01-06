@@ -19,6 +19,7 @@ import javafx.stage.Stage;
 import sonar.model.SonarState;
 import capteurs.model.HumidityState;
 import capteurs.model.TemperatureStatus;
+import capteurs.model.TemperatureStatus;
 
 import java.io.IOException;
 import java.net.URL;
@@ -125,7 +126,8 @@ public class View implements Initializable, IView {
      * Met à jour l'IHM (appelée depuis le thread FX via Platform.runLater).
      */
     public void updateUi(UiSnapshot snap) {
-        if (snap == null) return;
+        if (snap == null)
+            return;
 
         // Rover status
         if (lblStatusPill != null) {
@@ -147,7 +149,8 @@ public class View implements Initializable, IView {
         } else {
             lblSonarDistance.setText("—");
             lblSonarStatus.setText("Sonar: ?");
-            if (sonarDot != null) sonarDot.setVisible(false);
+            if (sonarDot != null)
+                sonarDot.setVisible(false);
         }
 
         // Humidité / température
@@ -215,7 +218,8 @@ public class View implements Initializable, IView {
      * Positionne/affiche le point sonar sur l'échelle (0..120 mm).
      */
     private void updateSonarDot(SonarState s) {
-        if (sonarDot == null) return;
+        if (sonarDot == null)
+            return;
         if (s == null || !s.attached() || Double.isNaN(s.distanceMm())) {
             sonarDot.setVisible(false);
             return;

@@ -7,6 +7,7 @@ import com.phidget22.TemperatureSensor;
 import common.EventBus;
 import capteurs.model.HumidityState;
 import capteurs.model.TemperatureStatus;
+import capteurs.model.TemperatureStatus;
 
 /**
  * Service bas niveau : lit le HUM1000_0 et publie "humidity.update".
@@ -14,9 +15,9 @@ import capteurs.model.TemperatureStatus;
 public class HumidityService {
 
     private static final int DEFAULT_PORT = 5661;
-    private static final int DEFAULT_HUB_PORT = 0;    // <-- adapte au port VINT utilisé
+    private static final int DEFAULT_HUB_PORT = 0;
     private static final int HUMIDITY_CHANNEL = 0;
-    private static final int TEMPERATURE_CHANNEL = 0; // même appareil, autre classe
+    private static final int TEMPERATURE_CHANNEL = 0;
     private static final int LOOP_MS = 500;
     private static final double TEMP_TOO_LOW_C = 0.0;
     private static final double TEMP_TOO_HIGH_C = 40.0;
@@ -30,6 +31,7 @@ public class HumidityService {
 
     private HumiditySensor humidity;
     private TemperatureSensor temperature;
+    private TemperatureStatus tempStatus = TemperatureStatus.NORMAL;
 
     private double lastHumidity = Double.NaN;
     private double lastTemperature = Double.NaN;
@@ -46,7 +48,8 @@ public class HumidityService {
     }
 
     public synchronized void start() {
-        if (running) return;
+        if (running)
+            return;
         running = true;
 
         Thread t = new Thread(() -> {
@@ -64,23 +67,34 @@ public class HumidityService {
                     if (humidity == null || temperature == null) {
                         err = "phidget not open";
                     } else {
-                        try {
-                            attached = humidity.getAttached() && temperature.getAttached();
-                        } catch (Throwable ignored) { }
+                        
+                            try {
+                                attached = humidity.getAttached() && temperature.getAttached();
+                            } catch (Throwable ignored) {
+                            }
 
-                        try {
-                            double h = humidity.getHumidity();
-                            if (!Double.isNaN(h)) lastHumidity = h;
-                        } catch (PhidgetException e) {
-                            err = "humidity read: " + e.getDescription() + " (code=" + e.getErrorCode() + ")";
-                        }
+                            try {
+                                double h = humidity.getHumidity();
+                                if (!Double.isNaN(h))
+                                    lastHumidity = h;
+                            } catch (PhidgetException e) {
+                                err = "humidity read: " + e.getDescription() + " (code=" + e.getErrorCode() + ")";
+                            }
 
-                        try {
-                            double tC = temperature.getTemperature();
-                            if (!Double.isNaN(tC)) lastTemperature = tC;
-                        } catch (PhidgetException e) {
-                            err = "temperature read: " + e.getDescription() + " (code=" + e.getErrorCode() + ")";
-                        }
+                            try {
+                                double tC = temperature.getTemperature();
+                                if (!Double.isNaN(tC))
+                                    lastTemperature = tC;
+
+                                if (tC > TEMP_MAX) {
+                                    tempStatus = TemperatureStatus.TOO_HIGH;
+                                } else if (tC < TEMP_MIN) {
+                                    tempStatus = TemperatureStatus.TOO_LOW;
+                                }
+                            } catch (PhidgetException e) {
+                                err = "temperature read: " + e.getDescription() + " (code=" + e.getErrorCode() + ")";
+                         }
+                        
                     }
                 } catch (PhidgetException e) {
                     err = "humidity error: " + e.getDescription() + " (code=" + e.getErrorCode() + ")";
@@ -98,11 +112,10 @@ public class HumidityService {
                         tempStatus,
                         attached,
                         ts,
-                        err);
+                        err,
+                        tempStatus);
 
                 EventBus.publish("humidity.update", state);
-                // Optionnel: rebond global capteurs si vous en avez besoin
-                // EventBus.publish("capteurs.update", state);
 
                 sleep(LOOP_MS);
             }
@@ -113,6 +126,7 @@ public class HumidityService {
 
         t.setDaemon(true);
         t.start();
+
     }
 
     public synchronized void stop() {
@@ -120,11 +134,13 @@ public class HumidityService {
     }
 
     private void ensureOpen() throws PhidgetException {
-        if (humidity != null && temperature != null) return;
+        if (humidity != null && temperature != null)
+            return;
 
         try {
             Net.addServer(serverName, ip, port, "", 0);
-        } catch (PhidgetException ignored) { }
+        } catch (PhidgetException ignored) {
+        }
 
         HumiditySensor h = new HumiditySensor();
         h.setServerName(serverName);
@@ -140,8 +156,14 @@ public class HumidityService {
             h.open(5000);
             t.open(5000);
         } catch (PhidgetException e) {
-            try { h.close(); } catch (Exception ignored) { }
-            try { t.close(); } catch (Exception ignored) { }
+            try {
+                h.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                t.close();
+            } catch (Exception ignored) {
+            }
             throw e;
         }
 
@@ -166,8 +188,16 @@ public class HumidityService {
     }
 
     private void safeClose() {
-        try { if (humidity != null) humidity.close(); } catch (Exception ignored) { }
-        try { if (temperature != null) temperature.close(); } catch (Exception ignored) { }
+        try {
+            if (humidity != null)
+                humidity.close();
+        } catch (Exception ignored) {
+        }
+        try {
+            if (temperature != null)
+                temperature.close();
+        } catch (Exception ignored) {
+        }
         humidity = null;
         temperature = null;
     }
