@@ -1,16 +1,24 @@
 package view;
 
+import filariane.controller.FilArianeController;
+import filariane.model.FilArianeModel;
+import filariane.view.FilArianeView;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Ellipse;
 import javafx.stage.Stage;
 import sonar.model.SonarState;
 import capteurs.model.HumidityState;
+import capteurs.model.TemperatureStatus;
 
 import java.io.IOException;
 import java.net.URL;
@@ -29,13 +37,26 @@ public class View implements Initializable, IView {
     private static final double SONAR_Y_MIN = 400.0; // correspond à min (40 mm)
     private static final double SONAR_Y_MAX = 50.0;  // correspond à max (2000 mm)
 
+    private static final double HUMIDITY_TOO_LOW = 30.0;
+    private static final double HUMIDITY_TOO_HIGH = 70.0;
+    private static final String MSG_WARN_STYLE = "-fx-text-fill: red;";
+    private static final String MSG_INFO_STYLE = "-fx-text-fill: #f5c46b;";
+    private static final String NA = "—";
+
     @FXML private Label lblTemperature;
     @FXML private Label lblHumidite;
     @FXML private Label lblMessage;
     @FXML private Label lblSonarDistance;
     @FXML private Label lblSonarStatus;
     @FXML private Label lblStatusPill;
+    @FXML private Button btnReinitialiser;
     @FXML private Ellipse sonarDot;
+    @FXML private Label lblFilArianeStats;
+    @FXML private Canvas filArianeCanvas;
+    @FXML private StackPane filArianeContainer;
+
+    private FilArianeController filArianeController;
+    private FilArianeView filArianeView;
 
     /**
      * Démarre la scène JavaFX dans le FX Application Thread.
@@ -66,6 +87,38 @@ public class View implements Initializable, IView {
         if (sonarDot != null) {
             sonarDot.setVisible(false);
         }
+
+        if (btnReinitialiser != null) {
+            btnReinitialiser.setText("Generer PDF mission");
+        }
+
+        if (filArianeCanvas != null) {
+            FilArianeModel filModel = new FilArianeModel();
+            filArianeController = new FilArianeController(filModel);
+            filArianeView = new FilArianeView(filArianeCanvas, filModel);
+
+            if (filArianeContainer != null) {
+                filArianeCanvas.widthProperty().bind(Bindings.createDoubleBinding(
+                        () -> Math.max(0.0,
+                                filArianeContainer.getWidth()
+                                        - filArianeContainer.getInsets().getLeft()
+                                        - filArianeContainer.getInsets().getRight()),
+                        filArianeContainer.widthProperty(),
+                        filArianeContainer.insetsProperty()));
+                filArianeCanvas.heightProperty().bind(Bindings.createDoubleBinding(
+                        () -> Math.max(0.0,
+                                filArianeContainer.getHeight()
+                                        - filArianeContainer.getInsets().getTop()
+                                        - filArianeContainer.getInsets().getBottom()),
+                        filArianeContainer.heightProperty(),
+                        filArianeContainer.insetsProperty()));
+            }
+
+            filArianeCanvas.widthProperty().addListener((obs, oldVal, newVal) -> filArianeView.render());
+            filArianeCanvas.heightProperty().addListener((obs, oldVal, newVal) -> filArianeView.render());
+            filArianeView.render();
+        }
+
     }
 
     /**
@@ -100,16 +153,62 @@ public class View implements Initializable, IView {
         // Humidité / température
         HumidityState h = snap.humidityState();
         if (h != null) {
-            String t = Double.isNaN(h.temperatureCelsius()) ? "—" : String.format("%.1f", h.temperatureCelsius());
-            String hum = Double.isNaN(h.humidityPercent()) ? "—" : String.format("%.1f", h.humidityPercent());
-            lblTemperature.setText(t);
-            lblHumidite.setText(hum);
-            lblMessage.setText(h.lastError() == null ? "" : h.lastError());
+            boolean attached = h.attached();
+            String t = Double.isNaN(h.temperatureCelsius()) ? NA : String.format("%.1f", h.temperatureCelsius());
+            String hum = Double.isNaN(h.humidityPercent()) ? NA : String.format("%.1f", h.humidityPercent());
+
+            String message = "";
+            String messageStyle = "";
+
+            TemperatureStatus tempStatus = h.temperatureStatus();
+            if (tempStatus == TemperatureStatus.TOO_HIGH) {
+                message = "⚠ Température trop élevée";
+                messageStyle = MSG_WARN_STYLE;
+                lblTemperature.setText(NA);
+            } else if (tempStatus == TemperatureStatus.TOO_LOW) {
+                message = "⚠ Température trop basse";
+                messageStyle = MSG_WARN_STYLE;
+                lblTemperature.setText(NA);
+            } else if (!attached) {
+                message = "Capteurs non connectés";
+                messageStyle = MSG_INFO_STYLE;
+                lblTemperature.setText(NA);
+            } else {
+                lblTemperature.setText(t);
+            }
+
+            if (!attached) {
+                lblHumidite.setText(NA);
+            } else {
+                lblHumidite.setText(hum);
+            }
+
+            if (message.isEmpty()) {
+                String err = h.lastError();
+                if (err != null && !err.isBlank()) {
+                    message = err;
+                    messageStyle = MSG_INFO_STYLE;
+                }
+            }
+
+            if (message.isEmpty() && attached && !Double.isNaN(h.humidityPercent())) {
+                if (h.humidityPercent() >= HUMIDITY_TOO_HIGH) {
+                    message = "Humidité trop élevée";
+                    messageStyle = MSG_INFO_STYLE;
+                } else if (h.humidityPercent() <= HUMIDITY_TOO_LOW) {
+                    message = "Humidité trop basse";
+                    messageStyle = MSG_INFO_STYLE;
+                }
+            }
+
+            setMessage(message, messageStyle);
         } else {
-            lblTemperature.setText("—");
-            lblHumidite.setText("—");
-            lblMessage.setText("");
+            lblTemperature.setText(NA);
+            lblHumidite.setText(NA);
+            setMessage("", "");
         }
+
+        updateFilAriane(snap);
     }
 
     /**
@@ -131,5 +230,32 @@ public class View implements Initializable, IView {
         double y = SONAR_Y_MIN - ((d - SONAR_MIN_MM) / (SONAR_MAX_MM - SONAR_MIN_MM)) * (SONAR_Y_MIN - SONAR_Y_MAX);
         sonarDot.setLayoutY(y);
         sonarDot.setVisible(true);
+    }
+
+    private void setMessage(String text, String style) {
+        if (lblMessage == null) {
+            return;
+        }
+        lblMessage.setText(text == null ? "" : text);
+        lblMessage.setStyle(style == null ? "" : style);
+    }
+
+    private void updateFilAriane(UiSnapshot snap) {
+        if (filArianeController == null || snap == null) {
+            return;
+        }
+
+        filArianeController.updateFromCommands(snap.leftCmd(), snap.rightCmd());
+
+        if (lblFilArianeStats != null) {
+            FilArianeModel.Pose pose = filArianeController.getModel().getCurrentPose();
+            double dist = filArianeController.getModel().getTotalDistanceM();
+            lblFilArianeStats.setText(String.format("X: %.2f  Y: %.2f  Dist: %.1fm",
+                    pose.x(), pose.y(), dist));
+        }
+
+        if (filArianeView != null) {
+            filArianeView.render();
+        }
     }
 }

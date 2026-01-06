@@ -6,6 +6,7 @@ import com.phidget22.PhidgetException;
 import com.phidget22.TemperatureSensor;
 import common.EventBus;
 import capteurs.model.HumidityState;
+import capteurs.model.TemperatureStatus;
 
 /**
  * Service bas niveau : lit le HUM1000_0 et publie "humidity.update".
@@ -17,6 +18,8 @@ public class HumidityService {
     private static final int HUMIDITY_CHANNEL = 0;
     private static final int TEMPERATURE_CHANNEL = 0; // même appareil, autre classe
     private static final int LOOP_MS = 500;
+    private static final double TEMP_TOO_LOW_C = 0.0;
+    private static final double TEMP_TOO_HIGH_C = 40.0;
 
     private final String serverName;
     private final String ip;
@@ -87,9 +90,12 @@ public class HumidityService {
                     safeClose();
                 }
 
+                TemperatureStatus tempStatus = computeTemperatureStatus(lastTemperature, attached);
+
                 HumidityState state = new HumidityState(
                         lastHumidity,
                         lastTemperature,
+                        tempStatus,
                         attached,
                         ts,
                         err);
@@ -144,6 +150,19 @@ public class HumidityService {
 
         System.out.printf("[HUM] Ouvert OK server=%s ip=%s:%d hubPort=%d%n",
                 serverName, ip, port, hubPort);
+    }
+
+    private TemperatureStatus computeTemperatureStatus(double tempC, boolean attached) {
+        if (!attached || Double.isNaN(tempC)) {
+            return TemperatureStatus.UNKNOWN;
+        }
+        if (tempC >= TEMP_TOO_HIGH_C) {
+            return TemperatureStatus.TOO_HIGH;
+        }
+        if (tempC <= TEMP_TOO_LOW_C) {
+            return TemperatureStatus.TOO_LOW;
+        }
+        return TemperatureStatus.OK;
     }
 
     private void safeClose() {

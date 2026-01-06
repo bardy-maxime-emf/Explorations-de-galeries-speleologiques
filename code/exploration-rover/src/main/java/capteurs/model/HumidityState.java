@@ -8,6 +8,7 @@ package capteurs.model;
 public record HumidityState(
         double humidityPercent,
         double temperatureCelsius,
+        TemperatureStatus temperatureStatus,
         boolean attached,
         long timestampMs,
         String lastError) {

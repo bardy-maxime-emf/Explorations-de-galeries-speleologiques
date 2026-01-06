@@ -1,5 +1,4 @@
 ﻿
-
 import common.EventBus;
 import javafx.application.Platform;
 import manette.controller.ManetteController;
@@ -43,13 +42,13 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.53"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+        String ip = "10.18.1.60"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
                                   // le rover !!
         int port = 5661;
-        String serverName = "host5000";
-        int motorHubPort = 4;
+        String serverName = "hub50000";
+        int motorHubPort = 5;
         int sonarHubPort = 3;
-        int temperaturePort = 2;
+        int temperaturePort = 4;
 
         // ===== CONFIG ROVER =====
         Connection connection = new Connection(serverName, ip, port, motorHubPort);
@@ -237,7 +236,8 @@ public class Main {
             double lt = padModel.getLeftTrigger(); // 0..1
             double throttle = clamp(rt - lt, -MAX_CMD, MAX_CMD);
 
-            // Rotation: deadzone + courbe cubique + gain plus doux + atténuation avec la vitesse
+            // Rotation: deadzone + courbe cubique + gain plus doux + atténuation avec la
+            // vitesse
             double turnRaw = padModel.getLeftX(); // -1..1
             if (Math.abs(turnRaw) < 0.12)
                 turnRaw = 0.0;
@@ -316,5 +316,3 @@ public class Main {
         return Math.max(min, Math.min(max, v));
     }
 }
-
-
