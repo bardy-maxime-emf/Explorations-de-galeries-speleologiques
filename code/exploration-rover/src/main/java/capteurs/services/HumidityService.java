@@ -7,7 +7,6 @@ import com.phidget22.TemperatureSensor;
 import common.EventBus;
 import capteurs.model.HumidityState;
 import capteurs.model.TemperatureStatus;
-import capteurs.model.TemperatureStatus;
 
 /**
  * Service bas niveau : lit le HUM1000_0 et publie "humidity.update".
@@ -31,7 +30,7 @@ public class HumidityService {
 
     private HumiditySensor humidity;
     private TemperatureSensor temperature;
-    private TemperatureStatus tempStatus = TemperatureStatus.NORMAL;
+    private TemperatureStatus tempStatus = TemperatureStatus.OK;
 
     private double lastHumidity = Double.NaN;
     private double lastTemperature = Double.NaN;
@@ -86,9 +85,9 @@ public class HumidityService {
                                 if (!Double.isNaN(tC))
                                     lastTemperature = tC;
 
-                                if (tC > TEMP_MAX) {
+                                if (tC > TEMP_TOO_HIGH_C) {
                                     tempStatus = TemperatureStatus.TOO_HIGH;
-                                } else if (tC < TEMP_MIN) {
+                                } else if (tC < TEMP_TOO_LOW_C) {
                                     tempStatus = TemperatureStatus.TOO_LOW;
                                 }
                             } catch (PhidgetException e) {

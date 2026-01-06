@@ -11,5 +11,6 @@ public record HumidityState(
         TemperatureStatus temperatureStatus,
         boolean attached,
         long timestampMs,
-        String lastError) {
+        String lastError,
+        TemperatureStatus tempstatus) {
 }
