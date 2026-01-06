@@ -1,4 +1,4 @@
-﻿package app;
+package app;
 
 import common.EventBus;
 import javafx.application.Platform;
@@ -258,6 +258,8 @@ public class Main {
             double lt = padModel.getLeftTrigger(); // 0..1
             double throttle = clamp(rt - lt, -MAX_CMD, MAX_CMD);
 
+            // Rotation: deadzone + courbe cubique + gain plus doux + atténuation avec la
+            // vitesse
             // Rotation: deadzone + courbe cubique + gain plus doux + atténuation avec la
             // vitesse
             double turnRaw = padModel.getLeftX(); // -1..1
