@@ -1,10 +1,11 @@
-﻿package app;
-
-import common.EventBus;
+﻿import common.EventBus;
 import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import manette.controller.ManetteController;
 import manette.model.ManetteModel;
 import manette.view.ManetteView;
+import mission.controller.MissionController;
 import rover.controller.RoverController;
 import rover.model.RoverModel;
 import rover.services.Connection;
@@ -17,6 +18,8 @@ import view.UiSnapshot;
 import view.View;
 
 import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.function.Consumer;
 
 import capteurs.controller.HumidityController;
@@ -46,10 +49,9 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.60"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
-                                  // le rover !!
+        String ip = "10.18.1.152";
         int port = 5661;
-        String serverName = "hub50000";
+        String serverName = "MaxRover";
         int motorHubPort = 5;
         int sonarHubPort = 3;
         int temperaturePort = 4;
@@ -66,6 +68,32 @@ public class Main {
         // Vue IHM JavaFX (View.fxml). Démarre le FX Application Thread.
         View ui = new View();
         ui.start();
+        MissionController mission = new MissionController(OBSTACLE_ON_MM);
+        ui.setOnGenerateReport(() -> {
+            Thread t = new Thread(() -> {
+                Path reportPath = mission.generateReport(Paths.get("reports"));
+                if (reportPath != null) {
+                    System.out.println("[MISSION] Rapport PDF genere: " + reportPath.toAbsolutePath());
+                } else {
+                    System.out.println("[MISSION] Rapport PDF non genere.");
+                }
+                Platform.runLater(() -> {
+                    AlertType type = reportPath != null ? AlertType.INFORMATION : AlertType.ERROR;
+                    Alert alert = new Alert(type);
+                    alert.setTitle("Mission report");
+                    if (reportPath != null) {
+                        alert.setHeaderText("PDF generated");
+                        alert.setContentText(reportPath.toAbsolutePath().toString());
+                    } else {
+                        alert.setHeaderText("PDF generation failed");
+                        alert.setContentText("Check the console for details.");
+                    }
+                    alert.show();
+                });
+            }, "mission-report");
+            t.setDaemon(true);
+            t.start();
+        });
 
         // ===== CONFIG MANETTE =====
         ManetteModel padModel = new ManetteModel();
@@ -172,6 +200,10 @@ public class Main {
                 humController.dispose();
             } catch (Exception ignored) {
             }
+            try {
+                mission.dispose();
+            } catch (Exception ignored) {
+            }
 
             System.out.println("[APP] Shutdown.");
         }));
@@ -206,7 +238,10 @@ public class Main {
                         roverModel.getRightCmd(),
                         latestSonarState,
                         humController.getLatestState(),
-                        lightController.getLatestState());
+                        lightController.getLatestState(),
+                        padModel.isConnected(),
+                        padModel.getBatteryLevel(),
+                        padModel.getBatteryType());
                 Platform.runLater(() -> ui.updateUi(snap));
             }
 
@@ -216,6 +251,7 @@ public class Main {
                     rover.stop();
                 } catch (Exception ignored) {
                 }
+                mission.updateDrive(roverModel.getLeftCmd(), roverModel.getRightCmd());
 
                 padModel.setLinkLost(false);
                 padModel.setObstacleTooClose(false);
@@ -273,6 +309,7 @@ public class Main {
             double left = clamp(throttle + turn, -MAX_CMD, MAX_CMD);
             double right = clamp(throttle - turn, -MAX_CMD, MAX_CMD);
             rover.applyDriveCommand(left, right);
+            mission.updateDrive(roverModel.getLeftCmd(), roverModel.getRightCmd());
 
             sleep(TELEOP_LOOP_MS);
         }
