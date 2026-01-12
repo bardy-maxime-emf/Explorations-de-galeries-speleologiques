@@ -19,10 +19,6 @@
     -fx-text-fill: #8db7a4;
     -fx-font-size: 12px;
 }
-.formLabel {
-    -fx-text-fill: #e9fff4;
-    -fx-font-weight: 600;
-}
 
 .statusDot {
     -fx-text-fill: #2ee58f;

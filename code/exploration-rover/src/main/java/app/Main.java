@@ -1,13 +1,9 @@
-﻿import common.EventBus;
-import common.RoverConfig;
+﻿
+import common.EventBus;
 import javafx.application.Platform;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Alert.AlertType;
-import javafx.stage.Stage;
 import manette.controller.ManetteController;
 import manette.model.ManetteModel;
 import manette.view.ManetteView;
-import mission.controller.MissionController;
 import rover.controller.RoverController;
 import rover.model.RoverModel;
 import rover.services.Connection;
@@ -16,14 +12,12 @@ import rover.view.RoverView;
 import sonar.model.SonarState;
 import sonar.services.SonarService;
 import sonar.view.SonarView;
-import view.SetupView;
 import view.UiSnapshot;
 import view.View;
+import tof.model.TofState;
+import tof.services.TofService;
 
 import java.lang.reflect.Method;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 import capteurs.controller.HumidityController;
@@ -49,57 +43,25 @@ public class Main {
 
     // Pour debug console SonarView
     private static volatile SonarState latestSonarState = null;
+    private static volatile TofState latestTofLeft = null;
+    private static volatile TofState latestTofRight = null;
 
     public static void main(String[] args) {
 
-        // Configuration rover via la vue de demarrage.
-        RoverConfig defaults = new RoverConfig("10.18.1.152", 5661, "MaxRover", 5, 3, 4, 2);
-        RoverConfig[] selected = new RoverConfig[1];
-        Connection[] selectedConnection = new Connection[1];
-        Stage[] stageHolder = new Stage[1];
-        CountDownLatch setupLatch = new CountDownLatch(1);
-
-        Runnable showSetup = () -> {
-            Stage stage = new Stage();
-            stageHolder[0] = stage;
-            SetupView setup = new SetupView(stage, defaults, (config, connection) -> {
-                selected[0] = config;
-                selectedConnection[0] = connection;
-                setupLatch.countDown();
-            }, () -> setupLatch.countDown());
-            setup.show();
-        };
-        try {
-            Platform.startup(showSetup);
-        } catch (IllegalStateException e) {
-            Platform.runLater(showSetup);
-        }
-
-        try {
-            setupLatch.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return;
-        }
-
-        RoverConfig config = selected[0];
-        if (config == null) {
-            Platform.exit();
-            return;
-        }
-
-        String ip = config.ip();
-        int port = config.port();
-        String serverName = config.serverName();
-        int motorHubPort = config.motorHubPort();
-        int sonarHubPort = config.sonarHubPort();
-        int temperaturePort = config.temperaturePort();
-        int lightHubPort = config.lightHubPort();
+        // Args: <ip> <port> <serverName>
+        String ip = "10.18.1.90"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+                                  // le rover !!
+        int port = 5661;
+        String serverName = "RK";
+        int motorHubPort = 4;
+        int sonarHubPort = 3;
+        int temperaturePort = 2;
+        int lightHubPort = 1;
+        int tofLeftHubPort = 0 ;// DST1001 gauche
+        int tofRightHubPort = 5; // DST1001 droite (adapter selon câblage)
 
         // ===== CONFIG ROVER =====
-        Connection connection = selectedConnection[0] != null
-                ? selectedConnection[0]
-                : new Connection(serverName, ip, port, motorHubPort);
+        Connection connection = new Connection(serverName, ip, port, motorHubPort);
         MotorService motorService = new MotorService(connection);
         motorService.setDebug(true);
 
@@ -108,34 +70,7 @@ public class Main {
         RoverView roverView = new RoverView(250);
         // Vue IHM JavaFX (View.fxml). Démarre le FX Application Thread.
         View ui = new View();
-        MissionController mission = new MissionController(OBSTACLE_ON_MM);
-        ui.setOnGenerateReport(() -> {
-            Thread t = new Thread(() -> {
-                Path reportPath = mission.generateReport(Paths.get("reports"));
-                if (reportPath != null) {
-                    System.out.println("[MISSION] Rapport PDF genere: " + reportPath.toAbsolutePath());
-                } else {
-                    System.out.println("[MISSION] Rapport PDF non genere.");
-                }
-                Platform.runLater(() -> {
-                    AlertType type = reportPath != null ? AlertType.INFORMATION : AlertType.ERROR;
-                    Alert alert = new Alert(type);
-                    alert.setTitle("Mission report");
-                    if (reportPath != null) {
-                        alert.setHeaderText("PDF generated");
-                        alert.setContentText(reportPath.toAbsolutePath().toString());
-                    } else {
-                        alert.setHeaderText("PDF generation failed");
-                        alert.setContentText("Check the console for details.");
-                    }
-                    alert.show();
-                });
-            }, "mission-report");
-            t.setDaemon(true);
-            t.start();
-        });
-        Stage mainStage = stageHolder[0] == null ? new Stage() : stageHolder[0];
-        Platform.runLater(() -> ui.show(mainStage));
+        ui.start();
 
         // ===== CONFIG MANETTE =====
         ManetteModel padModel = new ManetteModel();
@@ -147,6 +82,12 @@ public class Main {
         SonarService sonar = new SonarService(serverName, ip, port, sonarHubPort);
         SonarView sonarView = new SonarView(250);
         sonar.start();
+
+        // ===== TOF gauche/droite =====
+        TofService tofLeft = new TofService(serverName, ip, port, tofLeftHubPort, 0, "tof.left.update");
+        TofService tofRight = new TofService(serverName, ip, port, tofRightHubPort, 0, "tof.right.update");
+        tofLeft.start();
+        tofRight.start();
 
         // ===== Capteur température =====
         HumidityService humService = new HumidityService(serverName, ip, port, temperaturePort);
@@ -196,6 +137,19 @@ public class Main {
         };
         EventBus.subscribe("capteurs.update", capteursSubscriber);
 
+        Consumer<Object> tofLeftSubscriber = payload -> {
+            if (payload instanceof TofState s) {
+                latestTofLeft = s;
+            }
+        };
+        Consumer<Object> tofRightSubscriber = payload -> {
+            if (payload instanceof TofState s) {
+                latestTofRight = s;
+            }
+        };
+        EventBus.subscribe("tof.left.update", tofLeftSubscriber);
+        EventBus.subscribe("tof.right.update", tofRightSubscriber);
+
         // ===== START =====
         pad.startDebugLoop();
         tryConnectRover(rover);
@@ -222,6 +176,14 @@ public class Main {
             } catch (Exception ignored) {
             }
             try {
+                tofLeft.stop();
+            } catch (Exception ignored) {
+            }
+            try {
+                tofRight.stop();
+            } catch (Exception ignored) {
+            }
+            try {
                 lightService.stop();
             } catch (Exception ignored) {
             }
@@ -239,11 +201,15 @@ public class Main {
             } catch (Exception ignored) {
             }
             try {
-                humController.dispose();
+                EventBus.unsubscribe("tof.left.update", tofLeftSubscriber);
             } catch (Exception ignored) {
             }
             try {
-                mission.dispose();
+                EventBus.unsubscribe("tof.right.update", tofRightSubscriber);
+            } catch (Exception ignored) {
+            }
+            try {
+                humController.dispose();
             } catch (Exception ignored) {
             }
 
@@ -279,20 +245,11 @@ public class Main {
                         roverModel.getLeftCmd(),
                         roverModel.getRightCmd(),
                         latestSonarState,
+                        latestTofLeft,
+                        latestTofRight,
                         humController.getLatestState(),
-                        lightController.getLatestState(),
-                        padModel.isConnected(),
-                        padModel.getBatteryLevel(),
-                        padModel.getBatteryType());
+                        lightController.getLatestState());
                 Platform.runLater(() -> ui.updateUi(snap));
-            }
-
-            // --- Tentative reconnexion rover (meme si la manette n'est pas connectee) ---
-            boolean roverLinkOk = roverModel.isConnected();
-            if (!roverLinkOk && now >= nextRoverReconnectAt) {
-                nextRoverReconnectAt = now + ROVER_RECONNECT_MS;
-                tryConnectRover(rover);
-                roverLinkOk = roverModel.isConnected();
             }
 
             // --- Manette pas connectée -> stop rover ---
@@ -301,7 +258,6 @@ public class Main {
                     rover.stop();
                 } catch (Exception ignored) {
                 }
-                mission.updateDrive(roverModel.getLeftCmd(), roverModel.getRightCmd());
 
                 padModel.setLinkLost(false);
                 padModel.setObstacleTooClose(false);
@@ -312,7 +268,13 @@ public class Main {
             }
 
             // --- Perte de liaison rover (pour vibration "signal perdu") ---
+            boolean roverLinkOk = roverModel.isConnected();
             padModel.setLinkLost(!roverLinkOk);
+
+            if (!roverLinkOk && now >= nextRoverReconnectAt) {
+                nextRoverReconnectAt = now + ROVER_RECONNECT_MS;
+                tryConnectRover(rover);
+            }
 
             // --- SONAR: obstacle trop proche => vibration côté manette ---
             boolean obstacleTooClose = computeObstacleTooClose(now, obstacleActive);
@@ -353,7 +315,6 @@ public class Main {
             double left = clamp(throttle + turn, -MAX_CMD, MAX_CMD);
             double right = clamp(throttle - turn, -MAX_CMD, MAX_CMD);
             rover.applyDriveCommand(left, right);
-            mission.updateDrive(roverModel.getLeftCmd(), roverModel.getRightCmd());
 
             sleep(TELEOP_LOOP_MS);
         }

@@ -1,5 +1,8 @@
 package view;
 
+import capteurs.model.HumidityState;
+import capteurs.model.LightState;
+import capteurs.model.TemperatureStatus;
 import filariane.controller.FilArianeController;
 import filariane.model.FilArianeModel;
 import filariane.view.FilArianeView;
@@ -14,36 +17,25 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.Ellipse;
 import javafx.stage.Stage;
-import manette.model.ManetteModel;
 import sonar.model.SonarState;
-import capteurs.model.HumidityState;
-import capteurs.model.TemperatureStatus;
-import capteurs.model.LightState;
+import tof.model.TofState;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.ResourceBundle;
 
 /**
- * Vue JavaFX principale (basée sur View.fxml).
- * Implémente IView pour être lancée depuis l'app sans dépendre de Application.
+ * Vue JavaFX principale.
  */
 public class View implements Initializable, IView {
-
-    // Echelle sonar: ignore < MIN_MM, affiche jusqu'à MAX_MM
-    private static final double SONAR_MIN_MM = 40.0;
-    private static final double SONAR_MAX_MM = 2000.0; // 2 m
-    // Ancrages visuels issus du FXML (Y en pixels pour min/max)
-    private static final double SONAR_Y_MIN = 400.0; // correspond à min (40 mm)
-    private static final double SONAR_Y_MAX = 50.0; // correspond à max (2000 mm)
 
     private static final double HUMIDITY_TOO_LOW = 30.0;
     private static final double HUMIDITY_TOO_HIGH = 70.0;
     private static final String MSG_WARN_STYLE = "-fx-text-fill: red;";
     private static final String MSG_INFO_STYLE = "-fx-text-fill: #f5c46b;";
-    private static final String NA = "—";
+    private static final String NA = "?";
+    private static final long DIST_STALE_MS = 1000;
 
     @FXML
     private Label lblTemperature;
@@ -54,19 +46,25 @@ public class View implements Initializable, IView {
     @FXML
     private Label lblSonarDistance;
     @FXML
+    private Label lblDstLeft;
+    @FXML
+    private Label lblDstRight;
+    @FXML
+    private Label lblRadarHint;
+    @FXML
     private Label lblSonarStatus;
     @FXML
     private Label lblStatusPill;
     @FXML
-    private Label lblBatteryPill;
-    @FXML
     private Button btnReinitialiser;
-    @FXML
-    private Ellipse sonarDot;
     @FXML
     private Label lblFilArianeStats;
     @FXML
     private Canvas filArianeCanvas;
+    @FXML
+    private Canvas radarCanvas;
+    @FXML
+    private StackPane radarContainer;
     @FXML
     private StackPane filArianeContainer;
     @FXML
@@ -74,50 +72,32 @@ public class View implements Initializable, IView {
 
     private FilArianeController filArianeController;
     private FilArianeView filArianeView;
-    private Runnable onGenerateReport;
+    private RadarView radarView;
 
-    /**
-     * Démarre la scène JavaFX dans le FX Application Thread.
-     */
     @Override
     public void start() {
-        if (Platform.isFxApplicationThread()) {
-            show(new Stage());
-            return;
-        }
-        try {
-            Platform.startup(() -> show(new Stage()));
-        } catch (IllegalStateException e) {
-            Platform.runLater(() -> show(new Stage()));
-        }
-    }
+        Platform.startup(() -> {
+            try {
+                Stage mainStage = new Stage();
+                FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
+                fxmlLoader.setControllerFactory(type -> this);
 
-    public void show(Stage stage) {
-        try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
-            fxmlLoader.setControllerFactory(type -> this);
-
-            Parent root = fxmlLoader.load();
-            Scene principalScene = new Scene(root);
-            stage.setScene(principalScene);
-            stage.setTitle("Tableau de bord Rover");
-            stage.show();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            Platform.exit();
-        }
+                Parent root = fxmlLoader.load();
+                Scene principalScene = new Scene(root);
+                mainStage.setScene(principalScene);
+                mainStage.setTitle("Tableau de bord Rover");
+                mainStage.show();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+                Platform.exit();
+            }
+        });
     }
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        // Pas d'initialisation supplémentaire.
-        if (sonarDot != null) {
-            sonarDot.setVisible(false);
-        }
-
         if (btnReinitialiser != null) {
             btnReinitialiser.setText("Generer PDF mission");
-            btnReinitialiser.setOnAction(event -> handleGenerateReport());
         }
 
         if (filArianeCanvas != null) {
@@ -147,27 +127,29 @@ public class View implements Initializable, IView {
             filArianeView.render();
         }
 
-    }
-
-    public void setOnGenerateReport(Runnable onGenerateReport) {
-        this.onGenerateReport = onGenerateReport;
-        if (btnReinitialiser != null) {
-            btnReinitialiser.setDisable(false);
+        if (radarCanvas != null) {
+            radarView = new RadarView(radarCanvas);
+            if (radarContainer != null) {
+                radarCanvas.widthProperty().bind(Bindings.createDoubleBinding(
+                        () -> Math.max(0.0,
+                                radarContainer.getWidth()
+                                        - radarContainer.getInsets().getLeft()
+                                        - radarContainer.getInsets().getRight()),
+                        radarContainer.widthProperty(),
+                        radarContainer.insetsProperty()));
+                radarCanvas.heightProperty().bind(Bindings.createDoubleBinding(
+                        () -> Math.max(0.0,
+                                radarContainer.getHeight()
+                                        - radarContainer.getInsets().getTop()
+                                        - radarContainer.getInsets().getBottom()),
+                        radarContainer.heightProperty(),
+                        radarContainer.insetsProperty()));
+            }
+            radarCanvas.widthProperty().addListener((obs, o, n) -> radarView.render(null));
+            radarCanvas.heightProperty().addListener((obs, o, n) -> radarView.render(null));
         }
     }
 
-    @FXML
-    private void handleGenerateReport() {
-        if (onGenerateReport == null) {
-            System.out.println("[UI] Generate report clicked but handler is not set.");
-            return;
-        }
-        onGenerateReport.run();
-    }
-
-    /**
-     * Met à jour l'IHM (appelée depuis le thread FX via Platform.runLater).
-     */
     public void updateUi(UiSnapshot snap) {
         if (snap == null)
             return;
@@ -179,27 +161,28 @@ public class View implements Initializable, IView {
                     snap.speedMode(),
                     snap.emergencyStop()));
         }
-        if (lblBatteryPill != null) {
-            lblBatteryPill.setText(formatBattery(snap));
-        }
 
-        // Sonar
+        // Distances / radar
         SonarState s = snap.sonarState();
-        if (s != null) {
-            boolean hasDistance = !Double.isNaN(s.distanceMm()) && s.distanceMm() >= 0;
-            String dStr = hasDistance ? String.format("%.0f", s.distanceMm()) : "—";
-            lblSonarDistance.setText(dStr); // unité déjà présente dans le FXML
-            String err = (s.lastError() == null) ? "" : (" | Err: " + s.lastError());
-            lblSonarStatus.setText(String.format("Sonar: %s%s", s.attached() ? "OK" : "HS", err));
-            updateSonarDot(s);
-        } else {
-            lblSonarDistance.setText("—");
-            lblSonarStatus.setText("Sonar: ?");
-            if (sonarDot != null)
-                sonarDot.setVisible(false);
+        setDistanceLabel(lblSonarDistance, s == null ? Double.NaN : s.distanceMm());
+        lblSonarStatus.setText(s == null ? "Sonar: ?" : String.format("Sonar: %s%s",
+                s.attached() ? "OK" : "HS",
+                s.lastError() == null ? "" : " | " + s.lastError()));
+
+        setDistanceLabel(lblDstLeft, snap.tofLeftState() == null ? Double.NaN : snap.tofLeftState().distanceMm());
+        setDistanceLabel(lblDstRight, snap.tofRightState() == null ? Double.NaN : snap.tofRightState().distanceMm());
+        updateRadarSuggestion(snap);
+
+        if (radarView != null) {
+            RadarSnapshot radarSnap = new RadarSnapshot(
+                    snap.sonarState(),
+                    snap.tofLeftState(),
+                    snap.tofRightState(),
+                    System.currentTimeMillis());
+            radarView.render(radarSnap);
         }
 
-        // Humidité / température
+        // Humidite / temperature
         HumidityState h = snap.humidityState();
         if (h != null) {
             boolean attached = h.attached();
@@ -211,11 +194,11 @@ public class View implements Initializable, IView {
 
             TemperatureStatus tempStatus = h.temperatureStatus();
             if (tempStatus == TemperatureStatus.TOO_HIGH) {
-                message = "⚠ Température trop élevée";
+                message = "Température trop élevée";
                 messageStyle = MSG_WARN_STYLE;
                 lblTemperature.setText(NA);
             } else if (tempStatus == TemperatureStatus.TOO_LOW) {
-                message = "⚠ Température trop basse";
+                message = "Température trop basse";
                 messageStyle = MSG_WARN_STYLE;
                 lblTemperature.setText(NA);
             } else if (!attached) {
@@ -258,7 +241,7 @@ public class View implements Initializable, IView {
         }
 
         LightState l = snap.lightState();
-        if (l != null) { 
+        if (l != null) {
             String lux = Double.isNaN(l.illuminanceLux()) ? NA : String.format("%.1f", l.illuminanceLux());
             lblLuminosite.setText(lux);
             if (l.lastError() != null && !l.lastError().isBlank()) {
@@ -271,26 +254,47 @@ public class View implements Initializable, IView {
         updateFilAriane(snap);
     }
 
-    /**
-     * Positionne/affiche le point sonar sur l'échelle (0..120 mm).
-     */
-    private void updateSonarDot(SonarState s) {
-        if (sonarDot == null)
-            return;
-        if (s == null || !s.attached() || Double.isNaN(s.distanceMm())) {
-            sonarDot.setVisible(false);
+    private void setDistanceLabel(Label label, double v) {
+        if (label == null) {
             return;
         }
+        if (Double.isNaN(v) || v <= 0) {
+            label.setText(NA);
+        } else {
+            label.setText(String.format("%.0f", v));
+        }
+    }
 
-        double d = s.distanceMm();
-        if (d < SONAR_MIN_MM || d > SONAR_MAX_MM) {
-            sonarDot.setVisible(false);
+    private void updateRadarSuggestion(UiSnapshot snap) {
+        if (lblRadarHint == null) {
             return;
         }
+        double left = freshValue(snap.tofLeftState());
+        double right = freshValue(snap.tofRightState());
 
-        double y = SONAR_Y_MIN - ((d - SONAR_MIN_MM) / (SONAR_MAX_MM - SONAR_MIN_MM)) * (SONAR_Y_MIN - SONAR_Y_MAX);
-        sonarDot.setLayoutY(y);
-        sonarDot.setVisible(true);
+        String hint;
+        if (Double.isInfinite(left) && Double.isInfinite(right)) {
+            hint = "-";
+        } else if (left < right) {
+            hint = "Tourner droite";
+        } else if (right < left) {
+            hint = "Tourner gauche";
+        } else {
+            hint = "Avancer";
+        }
+        lblRadarHint.setText(hint);
+    }
+
+    private double freshValue(TofState s) {
+        if (s == null || !s.attached()) {
+            return Double.POSITIVE_INFINITY;
+        }
+        if (System.currentTimeMillis() - s.timestampMs() > DIST_STALE_MS) {
+            return Double.POSITIVE_INFINITY;
+        }
+        return Double.isNaN(s.distanceMm()) || s.distanceMm() <= 0
+                ? Double.POSITIVE_INFINITY
+                : s.distanceMm();
     }
 
     private void setMessage(String text, String style) {
@@ -318,49 +322,5 @@ public class View implements Initializable, IView {
         if (filArianeView != null) {
             filArianeView.render();
         }
-    }
-
-    private String formatBattery(UiSnapshot snap) {
-        if (snap == null || !snap.manetteConnected()) {
-            return "Batterie : n/d";
-        }
-        ManetteModel.BatteryType type = snap.batteryType();
-        ManetteModel.BatteryLevel level = snap.batteryLevel();
-        if (type == ManetteModel.BatteryType.WIRED) {
-            return "Batterie : 100% (USB)";
-        }
-        if (type == ManetteModel.BatteryType.DISCONNECTED) {
-            return "Batterie : n/d";
-        }
-        int pct = mapBatteryPercent(level);
-        if (pct < 0) {
-            return "Batterie : n/d";
-        }
-        String suffix = "";
-        if (type == ManetteModel.BatteryType.NIMH) {
-            suffix = " (NiMH)";
-        } else if (type == ManetteModel.BatteryType.ALKALINE) {
-            suffix = " (Alkaline)";
-        }
-        return "Batterie : " + pct + "%" + suffix;
-    }
-
-    private int mapBatteryPercent(ManetteModel.BatteryLevel level) {
-        if (level == null) {
-            return -1;
-        }
-        if (level == ManetteModel.BatteryLevel.FULL) {
-            return 100;
-        }
-        if (level == ManetteModel.BatteryLevel.MEDIUM) {
-            return 66;
-        }
-        if (level == ManetteModel.BatteryLevel.LOW) {
-            return 33;
-        }
-        if (level == ManetteModel.BatteryLevel.EMPTY) {
-            return 0;
-        }
-        return -1;
     }
 }

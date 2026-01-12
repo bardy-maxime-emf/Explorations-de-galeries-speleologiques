@@ -6,13 +6,9 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.shape.Ellipse?>
-<?import javafx.scene.shape.Line?>
-<?import javafx.scene.text.Text?>
 
 <BorderPane prefHeight="900" prefWidth="1280" styleClass="root" stylesheets="@styles.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="view.View">
 
@@ -33,10 +29,10 @@
             <Region HBox.hgrow="ALWAYS" />
 
             <Label fx:id="lblStatusPill" styleClass="pill" text="Status : En ligne" />
-            <Label fx:id="lblBatteryPill" styleClass="pill" text="Batterie : n/d" />
             <Button styleClass="iconBtn" text="[ ]" />
         </HBox>
     </top>
+
     <center>
         <VBox spacing="14" styleClass="page" BorderPane.alignment="CENTER">
             <padding>
@@ -46,64 +42,32 @@
             <!-- Main row -->
             <HBox spacing="14">
 
-                <!-- SONAR -->
+                <!-- SONAR / RADAR -->
                 <VBox spacing="10" styleClass="card" HBox.hgrow="ALWAYS">
                     <HBox alignment="CENTER_LEFT">
                         <VBox spacing="2">
-                            <Label styleClass="cardTitle" text="Visualisation Sonar" />
-                            <Label styleClass="cardSub" text="Scan statique - Portée: 12cm" />
+                            <Label styleClass="cardTitle" text="Visualisation Radar" />
+                            <Label styleClass="cardSub" text="Angles fixes: 0° / -20° / +20°" />
                         </VBox>
                         <Region HBox.hgrow="ALWAYS" />
                     </HBox>
 
-                    <!-- Zone sonar (dessin simple) -->
-                    <StackPane styleClass="panel">
-                        <Pane prefHeight="436.0" prefWidth="762.0">
-                            <Line endX="-100.0" endY="393.0" layoutX="176.0" layoutY="52.0" startX="-100.0" startY="-53.0" styleClass="sonarGraduation" />
-                            <Ellipse fx:id="cl120" layoutX="381.0" layoutY="98.0" radiusX="11.0" radiusY="9.0" stroke="BLACK" strokeType="INSIDE" styleClass="sonarBlipBlack" />
-                            <!-- Graduations principales (200 mm) et secondaires (100 mm, plus courtes) -->
-                            <Line endX="25.0" layoutX="177.0" layoutY="400.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="389.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="371.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="353.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="336.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="318.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="300.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="282.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="264.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="246.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="229.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="211.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="193.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="175.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="157.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="139.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="121.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="104.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="86.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="15.0" layoutX="177.0" layoutY="68.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Line endX="25.0" layoutX="177.0" layoutY="50.0" startX="-100.0" styleClass="sonarGraduation" />
-                            <Text layoutX="28.0" layoutY="404.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="40mm" />
-                            <Text layoutX="28.0" layoutY="375.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="200mm" />
-                            <Text layoutX="24.0" layoutY="339.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="400mm" />
-                            <Text layoutX="24.0" layoutY="302.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="600mm" />
-                            <Text layoutX="24.0" layoutY="266.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="800mm" />
-                            <Text layoutX="24.0" layoutY="231.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="1000mm" />
-                            <Text layoutX="24.0" layoutY="195.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="1200mm" />
-                            <Text layoutX="24.0" layoutY="159.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="1400mm" />
-                            <Text layoutX="24.0" layoutY="123.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="1600mm" />
-                            <Text layoutX="24.0" layoutY="88.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="1800mm" />
-                            <Text layoutX="24.0" layoutY="54.0" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="sonarGraduationText" text="2000mm" />
-                            <!-- Point dynamique qui suit la distance -->
-                            <Ellipse fx:id="sonarDot" layoutX="381.0" layoutY="400.0" radiusX="12.0" radiusY="10.0" style="-fx-fill: #2ee58f; -fx-stroke: transparent;" />
-                        </Pane>
+                    <StackPane fx:id="radarContainer" styleClass="panel" minHeight="320.0" prefHeight="380.0" VBox.vgrow="ALWAYS">
+                        <Canvas fx:id="radarCanvas" />
                     </StackPane>
 
                     <HBox spacing="8" alignment="CENTER_LEFT">
-                        <Label styleClass="muted" text="DISTANCE :" />
-                        <Label fx:id="lblSonarDistance" styleClass="bigValue" prefWidth="80" text="—" />
+                        <Label styleClass="muted" text="SONAR :" />
+                        <Label fx:id="lblSonarDistance" styleClass="bigValue" prefWidth="70" text="?" />
+                        <Label styleClass="unit" text="mm" />
+                        <Label styleClass="muted" text="DST G :" />
+                        <Label fx:id="lblDstLeft" styleClass="bigValue" prefWidth="70" text="?" />
+                        <Label styleClass="unit" text="mm" />
+                        <Label styleClass="muted" text="DST D :" />
+                        <Label fx:id="lblDstRight" styleClass="bigValue" prefWidth="70" text="?" />
                         <Label styleClass="unit" text="mm" />
                         <Region HBox.hgrow="ALWAYS" />
+                        <Label fx:id="lblRadarHint" styleClass="pill" text="-" />
                         <Label fx:id="lblSonarStatus" styleClass="mutedSmall" text="Sonar: ?" />
                     </HBox>
                 </VBox>
@@ -111,35 +75,35 @@
                 <!-- RIGHT SENSORS -->
                 <VBox prefWidth="360" spacing="10" styleClass="card">
                     <HBox alignment="CENTER_LEFT">
-                        <Label styleClass="cardTitle" text="Données Capteurs" />
+                        <Label styleClass="cardTitle" text="Donnees Capteurs" />
                         <Region HBox.hgrow="ALWAYS" />
-                        <Button fx:id="btnReinitialiser" onAction="#handleGenerateReport" styleClass="linkBtn" text="Generer PDF mission" />
+                        <Button fx:id="btnReinitialiser" styleClass="linkBtn" text="Generer PDF mission" />
                     </HBox>
 
                     <!-- Temp -->
                     <VBox spacing="8" styleClass="miniCard">
-                        <Label styleClass="miniTitle" text="Température" />
+                        <Label styleClass="miniTitle" text="Temperature" />
                         <HBox alignment="BASELINE_LEFT" spacing="6">
                             <Label fx:id="lblTemperature" styleClass="bigValue" />
                             <Label styleClass="unit" text="°C" />
                         </HBox>
-                        <Label styleClass="mutedSmall" text="Moyenne: 24.1°C" />
+                        <Label styleClass="mutedSmall" text="-" />
                     </VBox>
 
-                    <!-- Humidité -->
+                    <!-- Humidite -->
                     <VBox spacing="8" styleClass="miniCard">
-                        <Label styleClass="miniTitle" text="Humidité relative" />
+                        <Label styleClass="miniTitle" text="Humidite relative" />
                         <HBox alignment="BASELINE_LEFT" spacing="6">
-                            <Label fx:id="lblHumidite" styleClass="bigValue" />
-                            <!-- IMPORTANT: pour afficher % seul => "%%" -->
-                            <Label styleClass="unit" text="%%" />
+                        <Label fx:id="lblHumidite" styleClass="bigValue" />
+                        <!-- Escaper pour afficher un pourcentage -->
+                        <Label styleClass="unit" text="%%" />
                         </HBox>
                         <Label styleClass="mutedSmall" text="Zone de confort" />
                     </VBox>
 
-                    <!-- Lumière -->
+                    <!-- Lumiere -->
                     <VBox spacing="8" styleClass="miniCard">
-                        <Label styleClass="miniTitle" text="Intensité lumière" />
+                        <Label styleClass="miniTitle" text="Intensite lumiere" />
                         <HBox alignment="BASELINE_LEFT" spacing="6">
                             <Label fx:id="lblLuminosite" styleClass="bigValue" />
                             <Label styleClass="unit" text="Lux" />
@@ -148,7 +112,7 @@
                     </VBox>
 
                     <VBox spacing="8" styleClass="miniCard">
-                        <Label styleClass="miniTitle" text="Message système" />
+                        <Label styleClass="miniTitle" text="Message systeme" />
                         <Label fx:id="lblMessage" styleClass="sensorMessage" text="..." wrapText="true" />
                     </VBox>
                 </VBox>
