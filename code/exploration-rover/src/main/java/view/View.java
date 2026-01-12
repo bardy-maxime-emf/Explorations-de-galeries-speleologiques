@@ -72,6 +72,7 @@ public class View implements Initializable, IView {
 
     private FilArianeController filArianeController;
     private FilArianeView filArianeView;
+    private Runnable onGenerateReport;
     private RadarView radarView;
 
     @Override
@@ -147,9 +148,30 @@ public class View implements Initializable, IView {
             }
             radarCanvas.widthProperty().addListener((obs, o, n) -> radarView.render(null));
             radarCanvas.heightProperty().addListener((obs, o, n) -> radarView.render(null));
+            radarView.render(null);
+        }
+
+    }
+
+    public void setOnGenerateReport(Runnable onGenerateReport) {
+        this.onGenerateReport = onGenerateReport;
+        if (btnReinitialiser != null) {
+            btnReinitialiser.setDisable(false);
         }
     }
 
+    @FXML
+    private void handleGenerateReport() {
+        if (onGenerateReport == null) {
+            System.out.println("[UI] Generate report clicked but handler is not set.");
+            return;
+        }
+        onGenerateReport.run();
+    }
+
+    /**
+     * Met à jour l'IHM (appelée depuis le thread FX via Platform.runLater).
+     */
     public void updateUi(UiSnapshot snap) {
         if (snap == null)
             return;

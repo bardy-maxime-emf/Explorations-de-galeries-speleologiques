@@ -1,4 +1,4 @@
-﻿
+
 import common.EventBus;
 import javafx.application.Platform;
 import manette.controller.ManetteController;
@@ -48,17 +48,51 @@ public class Main {
 
     public static void main(String[] args) {
 
-        // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.90"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
-                                  // le rover !!
-        int port = 5661;
-        String serverName = "RK";
-        int motorHubPort = 4;
-        int sonarHubPort = 3;
-        int temperaturePort = 2;
-        int lightHubPort = 1;
-        int tofLeftHubPort = 0 ;// DST1001 gauche
-        int tofRightHubPort = 5; // DST1001 droite (adapter selon câblage)
+        // Configuration rover via la vue de demarrage.
+        RoverConfig defaults = new RoverConfig("10.18.1.152", 5661, "MaxRover", 5, 3, 4, 2, 0, 5);
+        RoverConfig[] selected = new RoverConfig[1];
+        Connection[] selectedConnection = new Connection[1];
+        Stage[] stageHolder = new Stage[1];
+        CountDownLatch setupLatch = new CountDownLatch(1);
+
+        Runnable showSetup = () -> {
+            Stage stage = new Stage();
+            stageHolder[0] = stage;
+            SetupView setup = new SetupView(stage, defaults, (config, connection) -> {
+                selected[0] = config;
+                selectedConnection[0] = connection;
+                setupLatch.countDown();
+            }, () -> setupLatch.countDown());
+            setup.show();
+        };
+        try {
+            Platform.startup(showSetup);
+        } catch (IllegalStateException e) {
+            Platform.runLater(showSetup);
+        }
+
+        try {
+            setupLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        RoverConfig config = selected[0];
+        if (config == null) {
+            Platform.exit();
+            return;
+        }
+
+        String ip = config.ip();
+        int port = config.port();
+        String serverName = config.serverName();
+        int motorHubPort = config.motorHubPort();
+        int sonarHubPort = config.sonarHubPort();
+        int temperaturePort = config.temperaturePort();
+        int lightHubPort = config.lightHubPort();
+        int tofLeftHubPort = config.tofLeftHubPort();
+        int tofRightHubPort = config.tofRightHubPort();
 
         // ===== CONFIG ROVER =====
         Connection connection = new Connection(serverName, ip, port, motorHubPort);
@@ -206,6 +240,10 @@ public class Main {
             }
             try {
                 EventBus.unsubscribe("tof.right.update", tofRightSubscriber);
+            } catch (Exception ignored) {
+            }
+            try {
+                humController.dispose();
             } catch (Exception ignored) {
             }
             try {
