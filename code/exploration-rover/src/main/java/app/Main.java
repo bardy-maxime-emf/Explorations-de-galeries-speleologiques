@@ -1,5 +1,4 @@
-﻿package app;
-
+﻿
 import common.EventBus;
 import javafx.application.Platform;
 import manette.controller.ManetteController;
@@ -15,6 +14,8 @@ import sonar.services.SonarService;
 import sonar.view.SonarView;
 import view.UiSnapshot;
 import view.View;
+import tof.model.TofState;
+import tof.services.TofService;
 
 import java.lang.reflect.Method;
 import java.util.function.Consumer;
@@ -42,18 +43,22 @@ public class Main {
 
     // Pour debug console SonarView
     private static volatile SonarState latestSonarState = null;
+    private static volatile TofState latestTofLeft = null;
+    private static volatile TofState latestTofRight = null;
 
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.60"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+        String ip = "10.18.1.90"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
                                   // le rover !!
         int port = 5661;
-        String serverName = "hub50000";
-        int motorHubPort = 5;
+        String serverName = "RK";
+        int motorHubPort = 4;
         int sonarHubPort = 3;
-        int temperaturePort = 4;
-        int lightHubPort = 2;
+        int temperaturePort = 2;
+        int lightHubPort = 1;
+        int tofLeftHubPort = 0 ;// DST1001 gauche
+        int tofRightHubPort = 5; // DST1001 droite (adapter selon câblage)
 
         // ===== CONFIG ROVER =====
         Connection connection = new Connection(serverName, ip, port, motorHubPort);
@@ -77,6 +82,12 @@ public class Main {
         SonarService sonar = new SonarService(serverName, ip, port, sonarHubPort);
         SonarView sonarView = new SonarView(250);
         sonar.start();
+
+        // ===== TOF gauche/droite =====
+        TofService tofLeft = new TofService(serverName, ip, port, tofLeftHubPort, 0, "tof.left.update");
+        TofService tofRight = new TofService(serverName, ip, port, tofRightHubPort, 0, "tof.right.update");
+        tofLeft.start();
+        tofRight.start();
 
         // ===== Capteur température =====
         HumidityService humService = new HumidityService(serverName, ip, port, temperaturePort);
@@ -126,6 +137,19 @@ public class Main {
         };
         EventBus.subscribe("capteurs.update", capteursSubscriber);
 
+        Consumer<Object> tofLeftSubscriber = payload -> {
+            if (payload instanceof TofState s) {
+                latestTofLeft = s;
+            }
+        };
+        Consumer<Object> tofRightSubscriber = payload -> {
+            if (payload instanceof TofState s) {
+                latestTofRight = s;
+            }
+        };
+        EventBus.subscribe("tof.left.update", tofLeftSubscriber);
+        EventBus.subscribe("tof.right.update", tofRightSubscriber);
+
         // ===== START =====
         pad.startDebugLoop();
         tryConnectRover(rover);
@@ -152,6 +176,14 @@ public class Main {
             } catch (Exception ignored) {
             }
             try {
+                tofLeft.stop();
+            } catch (Exception ignored) {
+            }
+            try {
+                tofRight.stop();
+            } catch (Exception ignored) {
+            }
+            try {
                 lightService.stop();
             } catch (Exception ignored) {
             }
@@ -166,6 +198,14 @@ public class Main {
             }
             try {
                 EventBus.unsubscribe("capteurs.update", capteursSubscriber);
+            } catch (Exception ignored) {
+            }
+            try {
+                EventBus.unsubscribe("tof.left.update", tofLeftSubscriber);
+            } catch (Exception ignored) {
+            }
+            try {
+                EventBus.unsubscribe("tof.right.update", tofRightSubscriber);
             } catch (Exception ignored) {
             }
             try {
@@ -205,6 +245,8 @@ public class Main {
                         roverModel.getLeftCmd(),
                         roverModel.getRightCmd(),
                         latestSonarState,
+                        latestTofLeft,
+                        latestTofRight,
                         humController.getLatestState(),
                         lightController.getLatestState());
                 Platform.runLater(() -> ui.updateUi(snap));
