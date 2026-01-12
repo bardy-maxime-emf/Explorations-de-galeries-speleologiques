@@ -1,6 +1,7 @@
 {
     "java.project.referencedLibraries": [
-        "lib/**/*.jar",
-        "code/exploration-rover/src/lib/phidget22.jar"
-    ]
+        "code/exploration-rover/lib/**/*.jar",
+        "code/exploration-rover/lib/phidget22.jar"
+    ],
+    "java.debug.settings.onBuildFailureProceed": true
 }

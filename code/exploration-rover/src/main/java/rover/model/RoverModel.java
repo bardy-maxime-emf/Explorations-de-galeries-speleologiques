@@ -1,51 +1,123 @@
 package rover.model;
 
+import rover.services.Connection;
+import rover.services.MotorService;
+
+/**
+ * État + règles métier rover (V1: drive + modes vitesse + e-stop).
+ * - Pas de capteurs ici.
+ * - L'e-stop bloque toute commande moteur tant qu'il n'est pas reset.
+ */
 public class RoverModel {
 
-    private final Connection gestionConnexion;
-    private RoverMateriel materielConnecte;
-
-    private boolean estConnecte = false;
-    private boolean arretUrgence = false;
-
-    private double vitesseGauche;
-    private double vitesseDroite;
-
-    public RoverModel(Connection gestionConnexion) {
-        this.gestionConnexion = gestionConnexion;
+    public enum SpeedMode {
+        SLOW, NORMAL
     }
 
-    // === Connexion (TU n’implémentes pas comment, tu APPELLES Connection) ===
+    private final Connection connection;
+    private final MotorService motorService;
 
-    public void connecter() throws Exception {
-        materielConnecte = gestionConnexion.seConnecter();
-        estConnecte = true;
-        arretUrgence = false;
+    private boolean emergencyStop = false;
+    private SpeedMode speedMode = SpeedMode.NORMAL;
+
+    // Commande normalisée -1..1
+    private double maxCmd = 1.0;
+    private double slowFactor = 0.4;
+
+    // Debug / état
+    private double leftCmd = 0.0;
+    private double rightCmd = 0.0;
+
+    public RoverModel(Connection connection, MotorService motorService) {
+        this.connection = connection;
+        this.motorService = motorService;
     }
 
-    public void deconnecter() throws Exception {
-        if (materielConnecte != null) {
-            materielConnecte.arreter();
-            gestionConnexion.seDeconnecter(materielConnecte);
+    // ===== Connexion =====
+
+    public void connect() throws Exception {
+        connection.connect();
+    }
+
+    public void disconnect() {
+        connection.disconnect();
+    }
+
+    public boolean isConnected() {
+        return connection.isConnected();
+    }
+
+    // ===== Drive =====
+
+    public void setSpeedMode(SpeedMode mode) {
+        this.speedMode = mode;
+    }
+
+    public SpeedMode getSpeedMode() {
+        return speedMode;
+    }
+
+    public boolean isEmergencyStop() {
+        return emergencyStop;
+    }
+
+    public void resetEmergencyStop() {
+        emergencyStop = false;
+    }
+
+    public void emergencyStop() throws Exception {
+        emergencyStop = true;
+        stop();
+    }
+
+    public void setWheelSpeeds(double left, double right) throws Exception {
+        if (!isConnected())
+            return;
+        if (emergencyStop)
+            return;
+
+        // mode lent
+        if (speedMode == SpeedMode.SLOW) {
+            left *= slowFactor;
+            right *= slowFactor;
         }
-        estConnecte = false;
+
+        left = clamp(left, -maxCmd, maxCmd);
+        right = clamp(right, -maxCmd, maxCmd);
+
+        leftCmd = left;
+        rightCmd = right;
+
+        motorService.setWheelSpeeds(left, right);
     }
 
-    // === Commande des roues ===
-    public void definirVitesseRoues(double gauche, double droite) throws Exception {
-        if (!estConnecte || arretUrgence) return;
-
-        vitesseGauche = gauche;
-        vitesseDroite = droite;
-
-        materielConnecte.definirVitesseRoues(gauche, droite);
+    public void stop() throws Exception {
+        leftCmd = 0.0;
+        rightCmd = 0.0;
+        if (isConnected())
+            motorService.stop();
     }
 
-    public void arretUrgence() throws Exception {
-        arretUrgence = true;
-        if (materielConnecte != null) {
-            materielConnecte.arreter();
-        }
+    public double getLeftCmd() {
+        return leftCmd;
+    }
+
+    public double getRightCmd() {
+        return rightCmd;
+    }
+
+    // ===== Config (optionnel) =====
+
+    public void setSlowFactor(double slowFactor) {
+        this.slowFactor = clamp(slowFactor, 0.05, 1.0);
+    }
+
+    public void setMaxCmd(double maxCmd) {
+        this.maxCmd = clamp(maxCmd, 0.1, 1.0);
+    }
+
+    private double clamp(double v, double min, double max) {
+        return Math.max(min, Math.min(max, v));
     }
 }
 
