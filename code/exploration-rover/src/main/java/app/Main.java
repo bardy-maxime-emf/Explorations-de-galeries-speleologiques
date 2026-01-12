@@ -1,4 +1,5 @@
-﻿
+package app;
+
 import common.EventBus;
 import javafx.application.Platform;
 import manette.controller.ManetteController;
@@ -19,8 +20,11 @@ import java.lang.reflect.Method;
 import java.util.function.Consumer;
 
 import capteurs.controller.HumidityController;
+import capteurs.controller.LightController;
 import capteurs.services.HumidityService;
+import capteurs.services.LightService;
 import capteurs.view.HumidityView;
+import capteurs.view.LightView;
 
 public class Main {
 
@@ -42,13 +46,14 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.60"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+        String ip = "10.18.1.64"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
                                   // le rover !!
         int port = 5661;
-        String serverName = "hub50000";
-        int motorHubPort = 5;
+        String serverName = "test2";
+        int motorHubPort = 4;
         int sonarHubPort = 3;
-        int temperaturePort = 4;
+        int temperaturePort = 2;
+        int lightHubPort = 1;
 
         // ===== CONFIG ROVER =====
         Connection connection = new Connection(serverName, ip, port, motorHubPort);
@@ -78,6 +83,12 @@ public class Main {
         HumidityController humController = new HumidityController();
         HumidityView humView = new HumidityView(500);
         humService.start();
+
+        // ===== Capteur lumiosité =====
+        LightService lightService = new LightService(serverName, ip, port, lightHubPort);
+        LightController lightController = new LightController();
+        LightView lightView = new LightView(500);
+        lightService.start();
 
         // ===== EventBus: récup distance + état sonar pour debug =====
         Consumer<Object> sonarSubscriber = payload -> {
@@ -140,6 +151,14 @@ public class Main {
                 sonar.stop();
             } catch (Exception ignored) {
             }
+            try {
+                lightService.stop();
+            } catch (Exception ignored) {
+            }
+            try {
+                lightController.dispose();
+            } catch (Exception ignored) {
+            }
 
             try {
                 EventBus.unsubscribe("sonar.update", sonarSubscriber);
@@ -171,6 +190,8 @@ public class Main {
             // --- Debug sonar (throttlé dans SonarView) ---
             sonarView.renderConsole(latestSonarState);
 
+            lightView.renderConsole(lightController.getLatestState());
+
             // --- Debug humidité/température ---
             humView.renderConsole(humController.getLatestState());
 
@@ -184,7 +205,8 @@ public class Main {
                         roverModel.getLeftCmd(),
                         roverModel.getRightCmd(),
                         latestSonarState,
-                        humController.getLatestState());
+                        humController.getLatestState(),
+                        lightController.getLatestState());
                 Platform.runLater(() -> ui.updateUi(snap));
             }
 
@@ -236,6 +258,8 @@ public class Main {
             double lt = padModel.getLeftTrigger(); // 0..1
             double throttle = clamp(rt - lt, -MAX_CMD, MAX_CMD);
 
+            // Rotation: deadzone + courbe cubique + gain plus doux + atténuation avec la
+            // vitesse
             // Rotation: deadzone + courbe cubique + gain plus doux + atténuation avec la
             // vitesse
             double turnRaw = padModel.getLeftX(); // -1..1
