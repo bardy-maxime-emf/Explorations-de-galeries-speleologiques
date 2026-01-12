@@ -42,6 +42,12 @@
 
                     <Label styleClass="formLabel" text="Hub port lumiere" GridPane.columnIndex="0" GridPane.rowIndex="6" />
                     <TextField fx:id="txtLightHubPort" promptText="2" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+
+                    <Label styleClass="formLabel" text="Hub port DST gauche" GridPane.columnIndex="0" GridPane.rowIndex="7" />
+                    <TextField fx:id="txtTofLeftHubPort" promptText="0" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+
+                    <Label styleClass="formLabel" text="Hub port DST droit" GridPane.columnIndex="0" GridPane.rowIndex="8" />
+                    <TextField fx:id="txtTofRightHubPort" promptText="5" GridPane.columnIndex="1" GridPane.rowIndex="8" />
                 </GridPane>
 
                 <HBox alignment="CENTER_LEFT" spacing="10">

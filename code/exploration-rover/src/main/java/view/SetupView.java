@@ -46,6 +46,10 @@ public class SetupView implements Initializable {
     @FXML
     private TextField txtLightHubPort;
     @FXML
+    private TextField txtTofLeftHubPort;
+    @FXML
+    private TextField txtTofRightHubPort;
+    @FXML
     private Label lblStatus;
     @FXML
     private Button btnConnect;
@@ -97,6 +101,8 @@ public class SetupView implements Initializable {
         txtSonarHubPort.setText(String.valueOf(defaults.sonarHubPort()));
         txtTemperaturePort.setText(String.valueOf(defaults.temperaturePort()));
         txtLightHubPort.setText(String.valueOf(defaults.lightHubPort()));
+        txtTofLeftHubPort.setText(String.valueOf(defaults.tofLeftHubPort()));
+        txtTofRightHubPort.setText(String.valueOf(defaults.tofRightHubPort()));
         if (btnConnect != null) {
             btnConnect.setText(LABEL_CONNECT);
         }
@@ -107,6 +113,8 @@ public class SetupView implements Initializable {
         bindRetryOnEdit(txtSonarHubPort);
         bindRetryOnEdit(txtTemperaturePort);
         bindRetryOnEdit(txtLightHubPort);
+        bindRetryOnEdit(txtTofLeftHubPort);
+        bindRetryOnEdit(txtTofRightHubPort);
         setStatus("Renseignez les parametres puis cliquez sur Connecter.", INFO_STYLE);
     }
 
@@ -159,6 +167,8 @@ public class SetupView implements Initializable {
         Integer sonarHubPort = parseInt(txtSonarHubPort, "Port hub sonar invalide.");
         Integer temperaturePort = parseInt(txtTemperaturePort, "Port hub temperature invalide.");
         Integer lightHubPort = parseInt(txtLightHubPort, "Port hub lumiere invalide.");
+        Integer tofLeftHubPort = parseInt(txtTofLeftHubPort, "Port hub ToF gauche invalide.");
+        Integer tofRightHubPort = parseInt(txtTofRightHubPort, "Port hub ToF droit invalide.");
 
         if (ip.isEmpty()) {
             setStatus("Adresse IP manquante.", ERROR_STYLE);
@@ -169,11 +179,12 @@ public class SetupView implements Initializable {
             return null;
         }
         if (port == null || motorHubPort == null || sonarHubPort == null || temperaturePort == null
-                || lightHubPort == null) {
+                || lightHubPort == null || tofLeftHubPort == null || tofRightHubPort == null) {
             return null;
         }
 
-        return new RoverConfig(ip, port, serverName, motorHubPort, sonarHubPort, temperaturePort, lightHubPort);
+        return new RoverConfig(ip, port, serverName, motorHubPort, sonarHubPort, temperaturePort, lightHubPort,
+                tofLeftHubPort, tofRightHubPort);
     }
 
     private ConnectionResult safeConnectForSetup(RoverConfig config) {

@@ -1,4 +1,4 @@
-﻿import common.EventBus;
+import common.EventBus;
 import common.RoverConfig;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
@@ -19,6 +19,8 @@ import sonar.view.SonarView;
 import view.SetupView;
 import view.UiSnapshot;
 import view.View;
+import tof.model.TofState;
+import tof.services.TofService;
 
 import java.lang.reflect.Method;
 import java.nio.file.Path;
@@ -49,11 +51,13 @@ public class Main {
 
     // Pour debug console SonarView
     private static volatile SonarState latestSonarState = null;
+    private static volatile TofState latestTofLeft = null;
+    private static volatile TofState latestTofRight = null;
 
     public static void main(String[] args) {
 
         // Configuration rover via la vue de demarrage.
-        RoverConfig defaults = new RoverConfig("10.18.1.152", 5661, "MaxRover", 5, 3, 4, 2);
+        RoverConfig defaults = new RoverConfig("10.18.1.152", 5661, "MaxRover", 5, 3, 4, 2, 0, 5);
         RoverConfig[] selected = new RoverConfig[1];
         Connection[] selectedConnection = new Connection[1];
         Stage[] stageHolder = new Stage[1];
@@ -95,6 +99,8 @@ public class Main {
         int sonarHubPort = config.sonarHubPort();
         int temperaturePort = config.temperaturePort();
         int lightHubPort = config.lightHubPort();
+        int tofLeftHubPort = config.tofLeftHubPort();
+        int tofRightHubPort = config.tofRightHubPort();
 
         // ===== CONFIG ROVER =====
         Connection connection = selectedConnection[0] != null
@@ -148,6 +154,12 @@ public class Main {
         SonarView sonarView = new SonarView(250);
         sonar.start();
 
+        // ===== TOF gauche/droite =====
+        TofService tofLeft = new TofService(serverName, ip, port, tofLeftHubPort, 0, "tof.left.update");
+        TofService tofRight = new TofService(serverName, ip, port, tofRightHubPort, 0, "tof.right.update");
+        tofLeft.start();
+        tofRight.start();
+
         // ===== Capteur température =====
         HumidityService humService = new HumidityService(serverName, ip, port, temperaturePort);
         HumidityController humController = new HumidityController();
@@ -196,6 +208,19 @@ public class Main {
         };
         EventBus.subscribe("capteurs.update", capteursSubscriber);
 
+        Consumer<Object> tofLeftSubscriber = payload -> {
+            if (payload instanceof TofState s) {
+                latestTofLeft = s;
+            }
+        };
+        Consumer<Object> tofRightSubscriber = payload -> {
+            if (payload instanceof TofState s) {
+                latestTofRight = s;
+            }
+        };
+        EventBus.subscribe("tof.left.update", tofLeftSubscriber);
+        EventBus.subscribe("tof.right.update", tofRightSubscriber);
+
         // ===== START =====
         pad.startDebugLoop();
         tryConnectRover(rover);
@@ -222,6 +247,14 @@ public class Main {
             } catch (Exception ignored) {
             }
             try {
+                tofLeft.stop();
+            } catch (Exception ignored) {
+            }
+            try {
+                tofRight.stop();
+            } catch (Exception ignored) {
+            }
+            try {
                 lightService.stop();
             } catch (Exception ignored) {
             }
@@ -236,6 +269,14 @@ public class Main {
             }
             try {
                 EventBus.unsubscribe("capteurs.update", capteursSubscriber);
+            } catch (Exception ignored) {
+            }
+            try {
+                EventBus.unsubscribe("tof.left.update", tofLeftSubscriber);
+            } catch (Exception ignored) {
+            }
+            try {
+                EventBus.unsubscribe("tof.right.update", tofRightSubscriber);
             } catch (Exception ignored) {
             }
             try {
@@ -279,6 +320,8 @@ public class Main {
                         roverModel.getLeftCmd(),
                         roverModel.getRightCmd(),
                         latestSonarState,
+                        latestTofLeft,
+                        latestTofRight,
                         humController.getLatestState(),
                         lightController.getLatestState(),
                         padModel.isConnected(),

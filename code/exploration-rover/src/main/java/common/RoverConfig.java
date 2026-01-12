@@ -7,5 +7,7 @@ public record RoverConfig(
         int motorHubPort,
         int sonarHubPort,
         int temperaturePort,
-        int lightHubPort) {
+        int lightHubPort,
+        int tofLeftHubPort,
+        int tofRightHubPort) {
 }
