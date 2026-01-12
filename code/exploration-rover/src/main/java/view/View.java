@@ -19,7 +19,7 @@ import javafx.stage.Stage;
 import sonar.model.SonarState;
 import capteurs.model.HumidityState;
 import capteurs.model.TemperatureStatus;
-import capteurs.model.TemperatureStatus;
+import capteurs.model.LightState;
 
 import java.io.IOException;
 import java.net.URL;
@@ -36,7 +36,7 @@ public class View implements Initializable, IView {
     private static final double SONAR_MAX_MM = 2000.0; // 2 m
     // Ancrages visuels issus du FXML (Y en pixels pour min/max)
     private static final double SONAR_Y_MIN = 400.0; // correspond à min (40 mm)
-    private static final double SONAR_Y_MAX = 50.0;  // correspond à max (2000 mm)
+    private static final double SONAR_Y_MAX = 50.0; // correspond à max (2000 mm)
 
     private static final double HUMIDITY_TOO_LOW = 30.0;
     private static final double HUMIDITY_TOO_HIGH = 70.0;
@@ -44,17 +44,30 @@ public class View implements Initializable, IView {
     private static final String MSG_INFO_STYLE = "-fx-text-fill: #f5c46b;";
     private static final String NA = "—";
 
-    @FXML private Label lblTemperature;
-    @FXML private Label lblHumidite;
-    @FXML private Label lblMessage;
-    @FXML private Label lblSonarDistance;
-    @FXML private Label lblSonarStatus;
-    @FXML private Label lblStatusPill;
-    @FXML private Button btnReinitialiser;
-    @FXML private Ellipse sonarDot;
-    @FXML private Label lblFilArianeStats;
-    @FXML private Canvas filArianeCanvas;
-    @FXML private StackPane filArianeContainer;
+    @FXML
+    private Label lblTemperature;
+    @FXML
+    private Label lblHumidite;
+    @FXML
+    private Label lblMessage;
+    @FXML
+    private Label lblSonarDistance;
+    @FXML
+    private Label lblSonarStatus;
+    @FXML
+    private Label lblStatusPill;
+    @FXML
+    private Button btnReinitialiser;
+    @FXML
+    private Ellipse sonarDot;
+    @FXML
+    private Label lblFilArianeStats;
+    @FXML
+    private Canvas filArianeCanvas;
+    @FXML
+    private StackPane filArianeContainer;
+    @FXML
+    private Label lblLuminosite;
 
     private FilArianeController filArianeController;
     private FilArianeView filArianeView;
@@ -209,6 +222,17 @@ public class View implements Initializable, IView {
             lblTemperature.setText(NA);
             lblHumidite.setText(NA);
             setMessage("", "");
+        }
+
+        LightState l = snap.lightState();
+        if (l != null) { 
+            String lux = Double.isNaN(l.illuminanceLux()) ? NA : String.format("%.1f", l.illuminanceLux());
+            lblLuminosite.setText(lux);
+            if (l.lastError() != null && !l.lastError().isBlank()) {
+                setMessage(l.lastError(), MSG_INFO_STYLE);
+            }
+        } else {
+            lblLuminosite.setText(NA);
         }
 
         updateFilAriane(snap);

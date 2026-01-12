@@ -1,4 +1,4 @@
-package app;
+﻿package app;
 
 import common.EventBus;
 import javafx.application.Platform;
@@ -46,14 +46,14 @@ public class Main {
     public static void main(String[] args) {
 
         // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.64"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
+        String ip = "10.18.1.60"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
                                   // le rover !!
         int port = 5661;
-        String serverName = "test2";
-        int motorHubPort = 4;
+        String serverName = "hub50000";
+        int motorHubPort = 5;
         int sonarHubPort = 3;
-        int temperaturePort = 2;
-        int lightHubPort = 1;
+        int temperaturePort = 4;
+        int lightHubPort = 2;
 
         // ===== CONFIG ROVER =====
         Connection connection = new Connection(serverName, ip, port, motorHubPort);
