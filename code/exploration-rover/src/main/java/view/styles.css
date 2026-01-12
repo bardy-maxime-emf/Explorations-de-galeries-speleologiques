@@ -55,6 +55,24 @@
     -fx-padding: 16;
 }
 
+.formLabel {
+    -fx-text-fill: #e9fff4;
+    -fx-font-weight: 700;
+}
+
+.formField {
+    -fx-text-fill: #ffffff;
+    -fx-prompt-text-fill: #cfe6db;
+    -fx-background-color: #0b1511;
+    -fx-border-color: #1a2f27;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.formField:focused {
+    -fx-border-color: #2ee58f;
+}
+
 .cardTitle {
     -fx-text-fill: #e9fff4;
     -fx-font-size: 16px;

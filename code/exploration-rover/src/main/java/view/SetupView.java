@@ -59,6 +59,7 @@ public class SetupView implements Initializable {
     private final BiConsumer<RoverConfig, Connection> onSuccess;
     private final Runnable onCancel;
     private volatile boolean connecting = false;
+    private volatile boolean completed = false;
 
     public SetupView(Stage stage, RoverConfig defaults, BiConsumer<RoverConfig, Connection> onSuccess,
             Runnable onCancel) {
@@ -78,6 +79,9 @@ public class SetupView implements Initializable {
             stage.setTitle("Configuration Rover");
             stage.show();
             stage.setOnCloseRequest(event -> {
+                if (completed) {
+                    return;
+                }
                 if (onCancel != null) {
                     onCancel.run();
                 }
@@ -143,9 +147,11 @@ public class SetupView implements Initializable {
         setConnecting(false);
         if (result.isOk()) {
             setStatus("Connexion OK.", OK_STYLE);
+            completed = true;
             if (onSuccess != null) {
                 onSuccess.accept(config, result.connection());
             }
+            stage.close();
             return;
         }
 

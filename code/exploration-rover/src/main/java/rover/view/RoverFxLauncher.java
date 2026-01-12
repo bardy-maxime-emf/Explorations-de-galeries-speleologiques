@@ -21,7 +21,16 @@ public class RoverFxLauncher {
     public static void start(RoverModel model) {
         if (started.compareAndSet(false, true)) {
             // Démarre la plateforme FX (crée le FX Application Thread).
-            Platform.startup(() -> initStage(model));
+            Runnable init = () -> initStage(model);
+            if (Platform.isFxApplicationThread()) {
+                init.run();
+                return;
+            }
+            try {
+                Platform.startup(init);
+            } catch (IllegalStateException e) {
+                Platform.runLater(init);
+            }
         } else {
             // Déjà démarré: on s'assure que la vue a la bonne référence modèle.
             Platform.runLater(() -> {

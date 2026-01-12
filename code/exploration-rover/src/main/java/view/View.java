@@ -77,7 +77,7 @@ public class View implements Initializable, IView {
 
     @Override
     public void start() {
-        Platform.startup(() -> {
+        Runnable showUi = () -> {
             try {
                 Stage mainStage = new Stage();
                 FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
@@ -92,7 +92,18 @@ public class View implements Initializable, IView {
                 ex.printStackTrace();
                 Platform.exit();
             }
-        });
+        };
+
+        if (Platform.isFxApplicationThread()) {
+            showUi.run();
+            return;
+        }
+
+        try {
+            Platform.startup(showUi);
+        } catch (IllegalStateException e) {
+            Platform.runLater(showUi);
+        }
     }
 
     @Override
@@ -341,6 +352,22 @@ public class View implements Initializable, IView {
                     pose.x(), pose.y(), dist));
         }
 
+        if (filArianeView != null) {
+            filArianeView.render();
+        }
+    }
+
+    public void resetMissionUi() {
+        if (filArianeController == null) {
+            return;
+        }
+        filArianeController.reset();
+        if (lblFilArianeStats != null) {
+            FilArianeModel.Pose pose = filArianeController.getModel().getCurrentPose();
+            double dist = filArianeController.getModel().getTotalDistanceM();
+            lblFilArianeStats.setText(String.format("X: %.2f  Y: %.2f  Dist: %.1fm",
+                    pose.x(), pose.y(), dist));
+        }
         if (filArianeView != null) {
             filArianeView.render();
         }

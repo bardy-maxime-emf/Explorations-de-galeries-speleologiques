@@ -23,31 +23,31 @@
 
                 <GridPane hgap="12" vgap="10">
                     <Label styleClass="formLabel" text="Adresse IP" GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                    <TextField fx:id="txtIp" promptText="10.18.1.152" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                    <TextField fx:id="txtIp" promptText="10.18.1.152" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
 
                     <Label styleClass="formLabel" text="Port reseau" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                    <TextField fx:id="txtPort" promptText="5661" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                    <TextField fx:id="txtPort" promptText="5661" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
 
                     <Label styleClass="formLabel" text="Nom serveur" GridPane.columnIndex="0" GridPane.rowIndex="2" />
-                    <TextField fx:id="txtServerName" promptText="MaxRover" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                    <TextField fx:id="txtServerName" promptText="MaxRover" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="2" />
 
                     <Label styleClass="formLabel" text="Hub port moteurs" GridPane.columnIndex="0" GridPane.rowIndex="3" />
-                    <TextField fx:id="txtMotorHubPort" promptText="5" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                    <TextField fx:id="txtMotorHubPort" promptText="5" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="3" />
 
                     <Label styleClass="formLabel" text="Hub port sonar" GridPane.columnIndex="0" GridPane.rowIndex="4" />
-                    <TextField fx:id="txtSonarHubPort" promptText="3" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                    <TextField fx:id="txtSonarHubPort" promptText="3" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="4" />
 
                     <Label styleClass="formLabel" text="Hub port temperature" GridPane.columnIndex="0" GridPane.rowIndex="5" />
-                    <TextField fx:id="txtTemperaturePort" promptText="4" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                    <TextField fx:id="txtTemperaturePort" promptText="4" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="5" />
 
                     <Label styleClass="formLabel" text="Hub port lumiere" GridPane.columnIndex="0" GridPane.rowIndex="6" />
-                    <TextField fx:id="txtLightHubPort" promptText="2" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+                    <TextField fx:id="txtLightHubPort" promptText="2" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="6" />
 
                     <Label styleClass="formLabel" text="Hub port DST gauche" GridPane.columnIndex="0" GridPane.rowIndex="7" />
-                    <TextField fx:id="txtTofLeftHubPort" promptText="0" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                    <TextField fx:id="txtTofLeftHubPort" promptText="0" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="7" />
 
                     <Label styleClass="formLabel" text="Hub port DST droit" GridPane.columnIndex="0" GridPane.rowIndex="8" />
-                    <TextField fx:id="txtTofRightHubPort" promptText="5" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                    <TextField fx:id="txtTofRightHubPort" promptText="5" styleClass="text-field formField" GridPane.columnIndex="1" GridPane.rowIndex="8" />
                 </GridPane>
 
                 <HBox alignment="CENTER_LEFT" spacing="10">
