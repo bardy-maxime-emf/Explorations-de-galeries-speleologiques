@@ -1,9 +1,12 @@
-﻿
+
 import common.EventBus;
+import common.RoverConfig;
 import javafx.application.Platform;
+import javafx.stage.Stage;
 import manette.controller.ManetteController;
 import manette.model.ManetteModel;
 import manette.view.ManetteView;
+import mission.controller.MissionController;
 import rover.controller.RoverController;
 import rover.model.RoverModel;
 import rover.services.Connection;
@@ -12,16 +15,22 @@ import rover.view.RoverView;
 import sonar.model.SonarState;
 import sonar.services.SonarService;
 import sonar.view.SonarView;
+import view.SetupView;
 import view.UiSnapshot;
 import view.View;
 import tof.model.TofState;
 import tof.services.TofService;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 import capteurs.controller.HumidityController;
 import capteurs.controller.LightController;
+import capteurs.model.HumidityState;
+import capteurs.model.LightState;
 import capteurs.services.HumidityService;
 import capteurs.services.LightService;
 import capteurs.view.HumidityView;
@@ -47,21 +56,60 @@ public class Main {
     private static volatile TofState latestTofRight = null;
 
     public static void main(String[] args) {
+        MissionController mission = new MissionController();
+        mission.startNewMission();
 
-        // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.90"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
-                                  // le rover !!
-        int port = 5661;
-        String serverName = "RK";
-        int motorHubPort = 4;
-        int sonarHubPort = 3;
-        int temperaturePort = 2;
-        int lightHubPort = 1;
-        int tofLeftHubPort = 0 ;// DST1001 gauche
-        int tofRightHubPort = 5; // DST1001 droite (adapter selon câblage)
+        // Configuration rover via la vue de demarrage.
+        RoverConfig defaults = new RoverConfig("10.18.1.152", 5661, "MaxRover", 4, 3, 2, 1, 5, 0);
+        RoverConfig[] selected = new RoverConfig[1];
+        Connection[] selectedConnection = new Connection[1];
+        Stage[] stageHolder = new Stage[1];
+        CountDownLatch setupLatch = new CountDownLatch(1);
+
+        Runnable showSetup = () -> {
+            Stage stage = new Stage();
+            stageHolder[0] = stage;
+            SetupView setup = new SetupView(stage, defaults, (config, connection) -> {
+                selected[0] = config;
+                selectedConnection[0] = connection;
+                setupLatch.countDown();
+            }, () -> setupLatch.countDown());
+            setup.show();
+        };
+        try {
+            Platform.startup(showSetup);
+        } catch (IllegalStateException e) {
+            Platform.runLater(showSetup);
+        }
+
+        try {
+            setupLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        RoverConfig config = selected[0];
+        if (config == null) {
+            Platform.exit();
+            return;
+        }
+
+        String ip = config.ip();
+        int port = config.port();
+        String serverName = config.serverName();
+        int motorHubPort = config.motorHubPort();
+        int sonarHubPort = config.sonarHubPort();
+        int temperaturePort = config.temperaturePort();
+        int lightHubPort = config.lightHubPort();
+        int tofLeftHubPort = config.tofLeftHubPort();
+        int tofRightHubPort = config.tofRightHubPort();
 
         // ===== CONFIG ROVER =====
-        Connection connection = new Connection(serverName, ip, port, motorHubPort);
+        Connection connection = selectedConnection[0];
+        if (connection == null) {
+            connection = new Connection(serverName, ip, port, motorHubPort);
+        }
         MotorService motorService = new MotorService(connection);
         motorService.setDebug(true);
 
@@ -71,6 +119,15 @@ public class Main {
         // Vue IHM JavaFX (View.fxml). Démarre le FX Application Thread.
         View ui = new View();
         ui.start();
+        ui.setOnGenerateReport(() -> {
+            try {
+                Path reportPath = mission.generateReportAndRestart();
+                System.out.println("[MISSION] Report saved: " + reportPath.toAbsolutePath());
+                ui.resetMissionUi();
+            } catch (IOException e) {
+                System.out.println("[MISSION] Report generation failed: " + e.getMessage());
+            }
+        });
 
         // ===== CONFIG MANETTE =====
         ManetteModel padModel = new ManetteModel();
@@ -212,6 +269,10 @@ public class Main {
                 humController.dispose();
             } catch (Exception ignored) {
             }
+            try {
+                humController.dispose();
+            } catch (Exception ignored) {
+            }
 
             System.out.println("[APP] Shutdown.");
         }));
@@ -238,6 +299,8 @@ public class Main {
             // --- Mise � jour IHM JavaFX (toutes ~200 ms) ---
             if (now >= nextUiUpdateAt) {
                 nextUiUpdateAt = now + 200;
+                HumidityState humState = humController.getLatestState();
+                LightState lightState = lightController.getLatestState();
                 UiSnapshot snap = new UiSnapshot(
                         roverModel.isConnected(),
                         roverModel.getSpeedMode(),
@@ -247,8 +310,16 @@ public class Main {
                         latestSonarState,
                         latestTofLeft,
                         latestTofRight,
-                        humController.getLatestState(),
-                        lightController.getLatestState());
+                        humState,
+                        lightState);
+                mission.update(
+                        roverModel.getLeftCmd(),
+                        roverModel.getRightCmd(),
+                        latestSonarState,
+                        latestTofLeft,
+                        latestTofRight,
+                        humState,
+                        lightState);
                 Platform.runLater(() -> ui.updateUi(snap));
             }
 
