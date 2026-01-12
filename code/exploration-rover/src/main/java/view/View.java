@@ -16,10 +16,11 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Ellipse;
 import javafx.stage.Stage;
+import manette.model.ManetteModel;
 import sonar.model.SonarState;
 import capteurs.model.HumidityState;
 import capteurs.model.TemperatureStatus;
-import capteurs.model.TemperatureStatus;
+import capteurs.model.LightState;
 
 import java.io.IOException;
 import java.net.URL;
@@ -36,7 +37,7 @@ public class View implements Initializable, IView {
     private static final double SONAR_MAX_MM = 2000.0; // 2 m
     // Ancrages visuels issus du FXML (Y en pixels pour min/max)
     private static final double SONAR_Y_MIN = 400.0; // correspond à min (40 mm)
-    private static final double SONAR_Y_MAX = 50.0;  // correspond à max (2000 mm)
+    private static final double SONAR_Y_MAX = 50.0; // correspond à max (2000 mm)
 
     private static final double HUMIDITY_TOO_LOW = 30.0;
     private static final double HUMIDITY_TOO_HIGH = 70.0;
@@ -44,42 +45,67 @@ public class View implements Initializable, IView {
     private static final String MSG_INFO_STYLE = "-fx-text-fill: #f5c46b;";
     private static final String NA = "—";
 
-    @FXML private Label lblTemperature;
-    @FXML private Label lblHumidite;
-    @FXML private Label lblMessage;
-    @FXML private Label lblSonarDistance;
-    @FXML private Label lblSonarStatus;
-    @FXML private Label lblStatusPill;
-    @FXML private Button btnReinitialiser;
-    @FXML private Ellipse sonarDot;
-    @FXML private Label lblFilArianeStats;
-    @FXML private Canvas filArianeCanvas;
-    @FXML private StackPane filArianeContainer;
+    @FXML
+    private Label lblTemperature;
+    @FXML
+    private Label lblHumidite;
+    @FXML
+    private Label lblMessage;
+    @FXML
+    private Label lblSonarDistance;
+    @FXML
+    private Label lblSonarStatus;
+    @FXML
+    private Label lblStatusPill;
+    @FXML
+    private Label lblBatteryPill;
+    @FXML
+    private Button btnReinitialiser;
+    @FXML
+    private Ellipse sonarDot;
+    @FXML
+    private Label lblFilArianeStats;
+    @FXML
+    private Canvas filArianeCanvas;
+    @FXML
+    private StackPane filArianeContainer;
+    @FXML
+    private Label lblLuminosite;
 
     private FilArianeController filArianeController;
     private FilArianeView filArianeView;
+    private Runnable onGenerateReport;
 
     /**
      * Démarre la scène JavaFX dans le FX Application Thread.
      */
     @Override
     public void start() {
-        Platform.startup(() -> {
-            try {
-                Stage mainStage = new Stage();
-                FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
-                fxmlLoader.setControllerFactory(type -> this);
+        if (Platform.isFxApplicationThread()) {
+            show(new Stage());
+            return;
+        }
+        try {
+            Platform.startup(() -> show(new Stage()));
+        } catch (IllegalStateException e) {
+            Platform.runLater(() -> show(new Stage()));
+        }
+    }
 
-                Parent root = fxmlLoader.load();
-                Scene principalScene = new Scene(root);
-                mainStage.setScene(principalScene);
-                mainStage.setTitle("Tableau de bord Rover");
-                mainStage.show();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-                Platform.exit();
-            }
-        });
+    public void show(Stage stage) {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
+            fxmlLoader.setControllerFactory(type -> this);
+
+            Parent root = fxmlLoader.load();
+            Scene principalScene = new Scene(root);
+            stage.setScene(principalScene);
+            stage.setTitle("Tableau de bord Rover");
+            stage.show();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            Platform.exit();
+        }
     }
 
     @Override
@@ -91,6 +117,7 @@ public class View implements Initializable, IView {
 
         if (btnReinitialiser != null) {
             btnReinitialiser.setText("Generer PDF mission");
+            btnReinitialiser.setOnAction(event -> handleGenerateReport());
         }
 
         if (filArianeCanvas != null) {
@@ -122,6 +149,22 @@ public class View implements Initializable, IView {
 
     }
 
+    public void setOnGenerateReport(Runnable onGenerateReport) {
+        this.onGenerateReport = onGenerateReport;
+        if (btnReinitialiser != null) {
+            btnReinitialiser.setDisable(false);
+        }
+    }
+
+    @FXML
+    private void handleGenerateReport() {
+        if (onGenerateReport == null) {
+            System.out.println("[UI] Generate report clicked but handler is not set.");
+            return;
+        }
+        onGenerateReport.run();
+    }
+
     /**
      * Met à jour l'IHM (appelée depuis le thread FX via Platform.runLater).
      */
@@ -135,6 +178,9 @@ public class View implements Initializable, IView {
                     snap.roverConnected() ? "En ligne" : "Hors ligne",
                     snap.speedMode(),
                     snap.emergencyStop()));
+        }
+        if (lblBatteryPill != null) {
+            lblBatteryPill.setText(formatBattery(snap));
         }
 
         // Sonar
@@ -211,6 +257,17 @@ public class View implements Initializable, IView {
             setMessage("", "");
         }
 
+        LightState l = snap.lightState();
+        if (l != null) { 
+            String lux = Double.isNaN(l.illuminanceLux()) ? NA : String.format("%.1f", l.illuminanceLux());
+            lblLuminosite.setText(lux);
+            if (l.lastError() != null && !l.lastError().isBlank()) {
+                setMessage(l.lastError(), MSG_INFO_STYLE);
+            }
+        } else {
+            lblLuminosite.setText(NA);
+        }
+
         updateFilAriane(snap);
     }
 
@@ -261,5 +318,49 @@ public class View implements Initializable, IView {
         if (filArianeView != null) {
             filArianeView.render();
         }
+    }
+
+    private String formatBattery(UiSnapshot snap) {
+        if (snap == null || !snap.manetteConnected()) {
+            return "Batterie : n/d";
+        }
+        ManetteModel.BatteryType type = snap.batteryType();
+        ManetteModel.BatteryLevel level = snap.batteryLevel();
+        if (type == ManetteModel.BatteryType.WIRED) {
+            return "Batterie : 100% (USB)";
+        }
+        if (type == ManetteModel.BatteryType.DISCONNECTED) {
+            return "Batterie : n/d";
+        }
+        int pct = mapBatteryPercent(level);
+        if (pct < 0) {
+            return "Batterie : n/d";
+        }
+        String suffix = "";
+        if (type == ManetteModel.BatteryType.NIMH) {
+            suffix = " (NiMH)";
+        } else if (type == ManetteModel.BatteryType.ALKALINE) {
+            suffix = " (Alkaline)";
+        }
+        return "Batterie : " + pct + "%" + suffix;
+    }
+
+    private int mapBatteryPercent(ManetteModel.BatteryLevel level) {
+        if (level == null) {
+            return -1;
+        }
+        if (level == ManetteModel.BatteryLevel.FULL) {
+            return 100;
+        }
+        if (level == ManetteModel.BatteryLevel.MEDIUM) {
+            return 66;
+        }
+        if (level == ManetteModel.BatteryLevel.LOW) {
+            return 33;
+        }
+        if (level == ManetteModel.BatteryLevel.EMPTY) {
+            return 0;
+        }
+        return -1;
     }
 }

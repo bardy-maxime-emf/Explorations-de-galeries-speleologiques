@@ -1,10 +1,13 @@
-package app;
-
-import common.EventBus;
+﻿import common.EventBus;
+import common.RoverConfig;
 import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.stage.Stage;
 import manette.controller.ManetteController;
 import manette.model.ManetteModel;
 import manette.view.ManetteView;
+import mission.controller.MissionController;
 import rover.controller.RoverController;
 import rover.model.RoverModel;
 import rover.services.Connection;
@@ -13,10 +16,14 @@ import rover.view.RoverView;
 import sonar.model.SonarState;
 import sonar.services.SonarService;
 import sonar.view.SonarView;
+import view.SetupView;
 import view.UiSnapshot;
 import view.View;
 
 import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 import capteurs.controller.HumidityController;
@@ -45,18 +52,54 @@ public class Main {
 
     public static void main(String[] args) {
 
-        // Args: <ip> <port> <serverName>
-        String ip = "10.18.1.64"; // Normalement c'est le seul param à changer !!Vérifier le cablage des port sur
-                                  // le rover !!
-        int port = 5661;
-        String serverName = "test2";
-        int motorHubPort = 4;
-        int sonarHubPort = 3;
-        int temperaturePort = 2;
-        int lightHubPort = 1;
+        // Configuration rover via la vue de demarrage.
+        RoverConfig defaults = new RoverConfig("10.18.1.152", 5661, "MaxRover", 5, 3, 4, 2);
+        RoverConfig[] selected = new RoverConfig[1];
+        Connection[] selectedConnection = new Connection[1];
+        Stage[] stageHolder = new Stage[1];
+        CountDownLatch setupLatch = new CountDownLatch(1);
+
+        Runnable showSetup = () -> {
+            Stage stage = new Stage();
+            stageHolder[0] = stage;
+            SetupView setup = new SetupView(stage, defaults, (config, connection) -> {
+                selected[0] = config;
+                selectedConnection[0] = connection;
+                setupLatch.countDown();
+            }, () -> setupLatch.countDown());
+            setup.show();
+        };
+        try {
+            Platform.startup(showSetup);
+        } catch (IllegalStateException e) {
+            Platform.runLater(showSetup);
+        }
+
+        try {
+            setupLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        RoverConfig config = selected[0];
+        if (config == null) {
+            Platform.exit();
+            return;
+        }
+
+        String ip = config.ip();
+        int port = config.port();
+        String serverName = config.serverName();
+        int motorHubPort = config.motorHubPort();
+        int sonarHubPort = config.sonarHubPort();
+        int temperaturePort = config.temperaturePort();
+        int lightHubPort = config.lightHubPort();
 
         // ===== CONFIG ROVER =====
-        Connection connection = new Connection(serverName, ip, port, motorHubPort);
+        Connection connection = selectedConnection[0] != null
+                ? selectedConnection[0]
+                : new Connection(serverName, ip, port, motorHubPort);
         MotorService motorService = new MotorService(connection);
         motorService.setDebug(true);
 
@@ -65,7 +108,34 @@ public class Main {
         RoverView roverView = new RoverView(250);
         // Vue IHM JavaFX (View.fxml). Démarre le FX Application Thread.
         View ui = new View();
-        ui.start();
+        MissionController mission = new MissionController(OBSTACLE_ON_MM);
+        ui.setOnGenerateReport(() -> {
+            Thread t = new Thread(() -> {
+                Path reportPath = mission.generateReport(Paths.get("reports"));
+                if (reportPath != null) {
+                    System.out.println("[MISSION] Rapport PDF genere: " + reportPath.toAbsolutePath());
+                } else {
+                    System.out.println("[MISSION] Rapport PDF non genere.");
+                }
+                Platform.runLater(() -> {
+                    AlertType type = reportPath != null ? AlertType.INFORMATION : AlertType.ERROR;
+                    Alert alert = new Alert(type);
+                    alert.setTitle("Mission report");
+                    if (reportPath != null) {
+                        alert.setHeaderText("PDF generated");
+                        alert.setContentText(reportPath.toAbsolutePath().toString());
+                    } else {
+                        alert.setHeaderText("PDF generation failed");
+                        alert.setContentText("Check the console for details.");
+                    }
+                    alert.show();
+                });
+            }, "mission-report");
+            t.setDaemon(true);
+            t.start();
+        });
+        Stage mainStage = stageHolder[0] == null ? new Stage() : stageHolder[0];
+        Platform.runLater(() -> ui.show(mainStage));
 
         // ===== CONFIG MANETTE =====
         ManetteModel padModel = new ManetteModel();
@@ -172,6 +242,10 @@ public class Main {
                 humController.dispose();
             } catch (Exception ignored) {
             }
+            try {
+                mission.dispose();
+            } catch (Exception ignored) {
+            }
 
             System.out.println("[APP] Shutdown.");
         }));
@@ -206,8 +280,19 @@ public class Main {
                         roverModel.getRightCmd(),
                         latestSonarState,
                         humController.getLatestState(),
-                        lightController.getLatestState());
+                        lightController.getLatestState(),
+                        padModel.isConnected(),
+                        padModel.getBatteryLevel(),
+                        padModel.getBatteryType());
                 Platform.runLater(() -> ui.updateUi(snap));
+            }
+
+            // --- Tentative reconnexion rover (meme si la manette n'est pas connectee) ---
+            boolean roverLinkOk = roverModel.isConnected();
+            if (!roverLinkOk && now >= nextRoverReconnectAt) {
+                nextRoverReconnectAt = now + ROVER_RECONNECT_MS;
+                tryConnectRover(rover);
+                roverLinkOk = roverModel.isConnected();
             }
 
             // --- Manette pas connectée -> stop rover ---
@@ -216,6 +301,7 @@ public class Main {
                     rover.stop();
                 } catch (Exception ignored) {
                 }
+                mission.updateDrive(roverModel.getLeftCmd(), roverModel.getRightCmd());
 
                 padModel.setLinkLost(false);
                 padModel.setObstacleTooClose(false);
@@ -226,13 +312,7 @@ public class Main {
             }
 
             // --- Perte de liaison rover (pour vibration "signal perdu") ---
-            boolean roverLinkOk = roverModel.isConnected();
             padModel.setLinkLost(!roverLinkOk);
-
-            if (!roverLinkOk && now >= nextRoverReconnectAt) {
-                nextRoverReconnectAt = now + ROVER_RECONNECT_MS;
-                tryConnectRover(rover);
-            }
 
             // --- SONAR: obstacle trop proche => vibration côté manette ---
             boolean obstacleTooClose = computeObstacleTooClose(now, obstacleActive);
@@ -273,6 +353,7 @@ public class Main {
             double left = clamp(throttle + turn, -MAX_CMD, MAX_CMD);
             double right = clamp(throttle - turn, -MAX_CMD, MAX_CMD);
             rover.applyDriveCommand(left, right);
+            mission.updateDrive(roverModel.getLeftCmd(), roverModel.getRightCmd());
 
             sleep(TELEOP_LOOP_MS);
         }

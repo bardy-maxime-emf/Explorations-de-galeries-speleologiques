@@ -33,6 +33,7 @@
             <Region HBox.hgrow="ALWAYS" />
 
             <Label fx:id="lblStatusPill" styleClass="pill" text="Status : En ligne" />
+            <Label fx:id="lblBatteryPill" styleClass="pill" text="Batterie : n/d" />
             <Button styleClass="iconBtn" text="[ ]" />
         </HBox>
     </top>
@@ -112,7 +113,7 @@
                     <HBox alignment="CENTER_LEFT">
                         <Label styleClass="cardTitle" text="Données Capteurs" />
                         <Region HBox.hgrow="ALWAYS" />
-                        <Button fx:id="btnReinitialiser" styleClass="linkBtn" text="Generer PDF mission" />
+                        <Button fx:id="btnReinitialiser" onAction="#handleGenerateReport" styleClass="linkBtn" text="Generer PDF mission" />
                     </HBox>
 
                     <!-- Temp -->

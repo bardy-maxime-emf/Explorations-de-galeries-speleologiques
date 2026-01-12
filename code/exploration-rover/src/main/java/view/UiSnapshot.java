@@ -2,6 +2,7 @@ package view;
 
 import capteurs.model.HumidityState;
 import capteurs.model.LightState;
+import manette.model.ManetteModel;
 import rover.model.RoverModel;
 import sonar.model.SonarState;
 
@@ -16,5 +17,8 @@ public record UiSnapshot(
                 double rightCmd,
                 SonarState sonarState,
                 HumidityState humidityState,
-                LightState lightState) {
+                LightState lightState,
+                boolean manetteConnected,
+                ManetteModel.BatteryLevel batteryLevel,
+                ManetteModel.BatteryType batteryType) {
 }
