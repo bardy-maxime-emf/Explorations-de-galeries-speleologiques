@@ -81,22 +81,31 @@ public class View implements Initializable, IView {
      */
     @Override
     public void start() {
-        Platform.startup(() -> {
-            try {
-                Stage mainStage = new Stage();
-                FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
-                fxmlLoader.setControllerFactory(type -> this);
+        if (Platform.isFxApplicationThread()) {
+            show(new Stage());
+            return;
+        }
+        try {
+            Platform.startup(() -> show(new Stage()));
+        } catch (IllegalStateException e) {
+            Platform.runLater(() -> show(new Stage()));
+        }
+    }
 
-                Parent root = fxmlLoader.load();
-                Scene principalScene = new Scene(root);
-                mainStage.setScene(principalScene);
-                mainStage.setTitle("Tableau de bord Rover");
-                mainStage.show();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-                Platform.exit();
-            }
-        });
+    public void show(Stage stage) {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("View.fxml"));
+            fxmlLoader.setControllerFactory(type -> this);
+
+            Parent root = fxmlLoader.load();
+            Scene principalScene = new Scene(root);
+            stage.setScene(principalScene);
+            stage.setTitle("Tableau de bord Rover");
+            stage.show();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            Platform.exit();
+        }
     }
 
     @Override

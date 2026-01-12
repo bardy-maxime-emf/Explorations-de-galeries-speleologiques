@@ -54,7 +54,7 @@ public class Connection {
     }
 
     public synchronized void disconnect() {
-        if (!connected)
+        if (!connected && leftMotor == null && rightMotor == null)
             return;
 
         try {
