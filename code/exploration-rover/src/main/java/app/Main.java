@@ -245,6 +245,14 @@ public class Main {
                 Platform.runLater(() -> ui.updateUi(snap));
             }
 
+            // --- Tentative reconnexion rover (meme si la manette n'est pas connectee) ---
+            boolean roverLinkOk = roverModel.isConnected();
+            if (!roverLinkOk && now >= nextRoverReconnectAt) {
+                nextRoverReconnectAt = now + ROVER_RECONNECT_MS;
+                tryConnectRover(rover);
+                roverLinkOk = roverModel.isConnected();
+            }
+
             // --- Manette pas connectée -> stop rover ---
             if (!padModel.isConnected()) {
                 try {
@@ -262,13 +270,7 @@ public class Main {
             }
 
             // --- Perte de liaison rover (pour vibration "signal perdu") ---
-            boolean roverLinkOk = roverModel.isConnected();
             padModel.setLinkLost(!roverLinkOk);
-
-            if (!roverLinkOk && now >= nextRoverReconnectAt) {
-                nextRoverReconnectAt = now + ROVER_RECONNECT_MS;
-                tryConnectRover(rover);
-            }
 
             // --- SONAR: obstacle trop proche => vibration côté manette ---
             boolean obstacleTooClose = computeObstacleTooClose(now, obstacleActive);
