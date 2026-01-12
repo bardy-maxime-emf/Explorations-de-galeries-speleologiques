@@ -44,8 +44,17 @@ public class Connection {
         // Déclare le serveur Phidget Network (publish ON côté hub)
         Net.addServer(serverName, ip, port, "", 0);
 
-        leftMotor = openMotor(motorHubPort, LEFT_MOTOR_CHANNEL);
-        rightMotor = openMotor(motorHubPort, RIGHT_MOTOR_CHANNEL);
+        try {
+            leftMotor = openMotor(motorHubPort, LEFT_MOTOR_CHANNEL);
+            rightMotor = openMotor(motorHubPort, RIGHT_MOTOR_CHANNEL);
+        } catch (PhidgetException e) {
+            safeCloseMotors();
+            try {
+                Net.removeServer(serverName);
+            } catch (Exception ignored) {
+            }
+            throw e;
+        }
 
         safeStop();
         connected = true;
@@ -128,6 +137,23 @@ public class Connection {
 
     private double clamp(double v) {
         return Math.max(-1.0, Math.min(1.0, v));
+    }
+
+    private void safeCloseMotors() {
+        try {
+            if (leftMotor != null) {
+                leftMotor.close();
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            if (rightMotor != null) {
+                rightMotor.close();
+            }
+        } catch (Exception ignored) {
+        }
+        leftMotor = null;
+        rightMotor = null;
     }
 
     public String getServerName() {

@@ -87,6 +87,7 @@ public class View implements Initializable, IView {
                 Scene principalScene = new Scene(root);
                 mainStage.setScene(principalScene);
                 mainStage.setTitle("Tableau de bord Rover");
+                mainStage.setOnCloseRequest(event -> System.exit(0));
                 mainStage.show();
             } catch (IOException ex) {
                 ex.printStackTrace();

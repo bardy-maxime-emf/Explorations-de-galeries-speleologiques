@@ -1,0 +1,21 @@
+{
+  "missionId": "20260112-165541-298",
+  "startAtMs": 1768233341310,
+  "endAtMs": 1768233376015,
+  "durationSec": 34.705,
+  "filAriane": {
+    "distanceM": 1.962,
+    "points": 15
+  },
+  "stats": {
+    "temperatureC": {"count":37,"avg":24.407,"min":24.390,"max":24.430},
+    "humidityPercent": {"count":37,"avg":18.419,"min":18.390,"max":18.460},
+    "lightLux": {"count":37,"avg":514.938,"min":459.530,"max":602.140},
+    "sonarMm": {"count":39,"avg":148.462,"min":80.000,"max":230.000},
+    "tofLeftMm": {"count":3,"avg":87.000,"min":75.000,"max":101.000},
+    "tofRightMm": {"count":37,"avg":101.459,"min":21.000,"max":158.000}
+  },
+  "events": [
+    {"type": "OBSTACLE_NEAR", "detail": "distance=140mm (<= 250mm)", "timestampMs": 1768233365372}
+  ]
+}

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import capteurs.controller.HumidityController;
@@ -211,7 +212,14 @@ public class Main {
         pad.startDebugLoop();
         tryConnectRover(rover);
 
+        long nextRoverReconnectAt = 0;
+        boolean obstacleActive = false;
+        long nextUiUpdateAt = 0;
+        AtomicBoolean running = new AtomicBoolean(true);
+
+        // ===== TELEOP LOOP =====
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            running.set(false);
             try {
                 rover.stop();
             } catch (Exception ignored) {
@@ -269,20 +277,11 @@ public class Main {
                 humController.dispose();
             } catch (Exception ignored) {
             }
-            try {
-                humController.dispose();
-            } catch (Exception ignored) {
-            }
 
             System.out.println("[APP] Shutdown.");
         }));
 
-        long nextRoverReconnectAt = 0;
-        boolean obstacleActive = false;
-        long nextUiUpdateAt = 0;
-
-        // ===== TELEOP LOOP =====
-        while (true) {
+        while (running.get()) {
             long now = System.currentTimeMillis();
 
             // --- Debug rover (throttlé dans RoverView) ---

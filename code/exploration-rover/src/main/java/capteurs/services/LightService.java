@@ -53,6 +53,7 @@ public class LightService {
                     ensureOpen();
                     if (lightSensor == null) {
                         err = "phidget not open";
+                        lastLux = Double.NaN;
                     } else {
                         try {
                             attached = lightSensor.getAttached();
@@ -61,16 +62,20 @@ public class LightService {
                         try {
                             double lux = lightSensor.getIlluminance();
                             if (!Double.isNaN(lux)) lastLux = lux;
+                            else lastLux = Double.NaN;
                         } catch (PhidgetException e) {
                             err = "light read: " + e.getDescription() + " (code=" + e.getErrorCode() + ")";
+                            lastLux = Double.NaN;
                         }
                     }
                 } catch (PhidgetException e) {
                     err = "light error: " + e.getDescription() + " (code=" + e.getErrorCode() + ")";
                     safeClose();
+                    lastLux = Double.NaN;
                 } catch (Throwable t0) {
                     err = "light error: " + t0.getClass().getSimpleName() + " - " + t0.getMessage();
                     safeClose();
+                    lastLux = Double.NaN;
                 }
 
                 LightState state = new LightState(lastLux, attached, ts, err);

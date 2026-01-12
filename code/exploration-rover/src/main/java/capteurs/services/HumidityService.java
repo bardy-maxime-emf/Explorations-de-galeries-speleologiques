@@ -111,8 +111,7 @@ public class HumidityService {
                         tempStatus,
                         attached,
                         ts,
-                        err,
-                        tempStatus);
+                        err);
 
                 EventBus.publish("humidity.update", state);
 
